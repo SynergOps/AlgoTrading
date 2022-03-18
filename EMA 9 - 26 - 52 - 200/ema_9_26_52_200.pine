@@ -1,0 +1,15 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Salih Emin (cerebrux)
+
+//@version=5
+indicator(title="EMA 9/26/52/200", overlay=true)
+
+shortest = ta.ema(close, 9)
+midshort = ta.ema(close, 26)
+longer = ta.ema(close, 52)
+longest = ta.ema(close, 200)
+
+plot(shortest, color = color.yellow)
+plot(midshort, color = color.purple)
+plot(longer, color = color.blue)
+plot(longest, color = color.red)
