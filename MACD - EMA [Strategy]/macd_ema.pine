@@ -1,0 +1,40 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Salih Emin (cerebrux)
+
+//@version=5
+strategy("MACD EMA filter strategy", shorttitle= "MACD / EMA filter", overlay=false)
+
+// Variables that you can optimize based on the timeframe or underlining asset
+
+fastLength = input(12)
+slowlength = input(26)
+MACDLength = input(9)
+EMA = input(200)
+
+// Calculation of MACD Components
+
+MACD = ta.ema(close, fastLength) - ta.ema(close, slowlength)
+signal = ta.ema(MACD, MACDLength)
+deltaHistogram = MACD-signal
+
+// ================ Strategy =============================================== 
+
+// If there is a crossover of signal and MACD line and the price closed above the EMA, enter a long position
+// Exit when a crossunder of signal and MACD line happens
+if (ta.crossover(deltaHistogram, 0)) and close>ta.ema(close, EMA)
+    strategy.entry("long",strategy.long, comment="Enter Long")
+if (ta.crossunder(deltaHistogram, 0))
+    strategy.close("long", comment="Exit Long")
+
+// If there is a crossunder of signal and MACD line and the price closed bleow the EMA, enter a short position
+// Exit when a crossover of signal and MACD line happens
+if (ta.crossunder(deltaHistogram, 0)) and close<ta.ema(close, EMA)
+    strategy.entry("short",strategy.short, comment="Enter Short")
+if (ta.crossover(deltaHistogram, 0))
+    strategy.close("short", comment="Exit Short")
+//===========================================================================
+// Display the MACD indicator components
+
+plot(deltaHistogram,title="MACD histogram",style=plot.style_histogram,color=color.blue)
+plot(MACD, title="MACD line",color=color.green)
+plot(signal,title="signal line",color=color.red)
