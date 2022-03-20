@@ -1,0 +1,23 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Salih Emin (cerebrux)
+
+//@version=5
+strategy('Pullback Strategy for Stocks', overlay=true)
+
+// Variables
+longEMA = input(defval=200, title="Long trending EMA")
+shortEMA = input(defval=50, title="Short trending EMA")
+takeProfit = input(defval=0.30, title="Take Profit distance")
+stopLoss = input(defval=0.10, title="Stop Loss distance")
+
+//Calculating the exit price for take profit and stop loss based on our entry
+longProfit = strategy.position_avg_price * (1 + takeProfit)
+longStop = strategy.position_avg_price * (1 - stopLoss)
+
+if close > ta.ema(close, longEMA) and close < ta.sma(close, shortEMA)
+    strategy.entry('Enter long', strategy.long)
+
+//for long positions
+if strategy.position_size > 0
+    strategy.exit(id='Close Position', stop=longStop, limit=longProfit)
+
