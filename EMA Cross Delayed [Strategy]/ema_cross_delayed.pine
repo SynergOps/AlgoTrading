@@ -1,0 +1,36 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Salih Emin (cerebrux)
+
+//@version=5
+strategy('Moving Average Cross', overlay=true, default_qty_value = 100, default_qty_type = strategy.percent_of_equity, initial_capital = 1000)
+
+// Variables
+shortEMA = ta.ema(close, input(defval=20, title="Short period EMA")) 
+longEMA = ta.ema(close, input(defval=50, title="Long period EMA"))
+
+// Trading periods
+start = timestamp(2000, 6, 1, 0, 0) // use data from 2000
+end = timestamp(2099, 6, 1, 0, 0) // until 2099
+
+// Signals
+longSignal = shortEMA > longEMA
+shortSignal = shortEMA < longEMA
+
+// Filters that add delay for entry and closing times
+longCondition = longSignal and longSignal[10] and not longSignal[11]
+shortCondition = shortSignal and shortSignal[10] and not shortSignal[11]
+
+closeLong = shortEMA < longEMA and not longSignal[11]
+closeShort = shortEMA > longEMA and not shortSignal[11]
+
+// Strategy 
+if time >= start and time <= end // trade only on the specified period
+    strategy.entry('Enter Long', strategy.long, 1000.0, when=longCondition)
+    strategy.entry('Enter Short', strategy.short, 1000.0, when=shortCondition)
+
+strategy.close('Close Long', when=closeShort)
+strategy.close('Close Short', when=closeLong)
+
+// Display
+plot(shortEMA, title='Short period EMA', color=color.new(#33FF33, 0), linewidth=3)
+plot(longEMA, title='Long period EMA', color=color.new(#FF3333, 0), linewidth=2)
