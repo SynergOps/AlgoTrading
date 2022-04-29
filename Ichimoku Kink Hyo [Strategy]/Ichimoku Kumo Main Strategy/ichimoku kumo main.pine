@@ -1,0 +1,61 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Salih Emin (cerebrux)
+
+//@version=5
+strategy('Ichimoku Kinko Hyo: Basic Strategy', overlay=true, default_qty_value = 100, default_qty_type = strategy.percent_of_equity, initial_capital = 1000)
+
+//Inputs
+Tenkan_sen = input.int(9, minval=1, title='Tenkan-Sen')
+Kijun_sen = input.int(26, minval=1, title='Kijun-Sen')
+Senku_spanB = input.int(52, minval=1, title='Senkou-Span B')
+Chiku_span_offset = input.int(26, minval=1, title='Chikou-Span Offset')
+Kumo_offset = input.int(26, minval=1, title='Kumo Offset')
+
+middle(len) => math.avg(ta.lowest(len), ta.highest(len))
+
+// Ichimoku Components
+tenkan = middle(Tenkan_sen)
+kijun = middle(Kijun_sen)
+senkouA = math.avg(tenkan, kijun)
+senkouB = middle(Senku_spanB)
+
+// Plot Ichimoku Kinko Hyo
+plot(tenkan, color=color.new(#0496ff, 0), title='Tenkan-Sen')
+plot(kijun, color=color.new(#991515, 0), title='Kijun-Sen')
+plot(close, offset=-Chiku_span_offset + 1, color=color.new(#459915, 0), title='Chikou-Span')
+senkouAplot = plot(senkouA, offset=Kumo_offset - 1, color=color.new(color.green, 0), title='Senkou-Span A')
+senkouBplot = plot(senkouB, offset=Kumo_offset - 1, color=color.new(color.red, 0), title='Senkou-Span B')
+fill(senkouAplot, senkouBplot, color = senkouA > senkouB ? color.rgb(67, 160, 71, 90) : color.rgb(244, 67, 54, 90), title='Cloud color')
+
+ss_high = math.max(senkouA[Kumo_offset - 1], senkouB[Kumo_offset - 1])
+ss_low = math.min(senkouA[Kumo_offset - 1], senkouB[Kumo_offset - 1])
+
+// Entry Signals
+
+// Conditions for Long
+long_entry = input(true, title='Long Entry')
+price_above_kumo = close > ss_high
+kijun_above_kumo = kijun > ss_high
+tk_cross_bull = tenkan > kijun
+cs_cross_bull = ta.mom(close, Chiku_span_offset - 1) > 0
+
+// long signal when above conditions allign
+bullish = tk_cross_bull and cs_cross_bull and price_above_kumo and kijun_above_kumo
+
+// Conditions for Short
+short_entry = input(true, title='Short Entry')
+tk_cross_bear = tenkan < kijun
+cs_cross_bear = ta.mom(close, Chiku_span_offset - 1) < 0
+price_below_kumo = close < ss_low
+kijun_below_kumo = kijun < ss_low
+
+// short signal when above conditions allign
+bearish = tk_cross_bear and cs_cross_bear and price_below_kumo and kijun_below_kumo
+
+strategy.entry('Long', strategy.long, when=bullish and long_entry)
+strategy.close('Long', when=bearish and not short_entry)
+
+strategy.entry('Short', strategy.short, when=bearish and short_entry)
+strategy.close('Short', when=bullish and not long_entry)
+
+
