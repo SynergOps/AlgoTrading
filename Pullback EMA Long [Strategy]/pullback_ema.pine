@@ -14,7 +14,7 @@ stopLoss = input(defval=0.10, title="Stop Loss distance")
 longProfit = strategy.position_avg_price * (1 + takeProfit)
 longStop = strategy.position_avg_price * (1 - stopLoss)
 
-if close > ta.ema(close, longEMA) and close < ta.sma(close, shortEMA)
+if close > ta.ema(close, longEMA) and close < ta.ema(close, shortEMA)
     strategy.entry('Enter long', strategy.long)
 
 //for long positions
