@@ -1,8 +1,9 @@
 # AlgoTrading
-Collection of algorithmic trading helper files for TradingView
+Collection of algorithmic trading, helper files for TradingView
 
 ## How to use
-First, read the README file that every Indicator and Strategy has in its folder, just to get an idea on how it works and what to expect from it. 
+First, read the README file of every Indicator and Strategy to get an idea on how it works and what to expect from it.
+ 
 Then you can just copy the code of the *.pine* and paste it in the Pine Editor of your TradingView account. 
 
 - Once you paste the code, you should then click **Save**
