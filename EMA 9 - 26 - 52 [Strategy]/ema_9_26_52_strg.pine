@@ -1,0 +1,36 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Salih Emin (cerebrux)
+
+//@version=5
+strategy('EMA 9/26/52 Cross Strategy', overlay=true, default_qty_value = 100, default_qty_type = strategy.percent_of_equity, initial_capital = 1000)
+shortest = ta.ema(close, 9)
+midshort = ta.ema(close, 26)
+longer = ta.ema(close, 52)
+
+
+plot(shortest, color = color.green)
+plot(midshort, color = color.red)
+plot(longer, color = color.blue)
+plot(ta.crossover(shortest, midshort) ? midshort : na, style=plot.style_cross, color=color.new(color.green, 0), linewidth=3)
+plot(ta.crossunder(shortest, midshort) ? midshort : na, style=plot.style_cross, color=color.new(color.red, 0), linewidth=3)
+// Entry Signals //
+
+// Conditions for Long
+price_above_longer = close > longer
+cross_bull = ta.crossover(shortest, midshort)
+
+// Conditions for Short
+price_below_longer = close < longer
+cross_bear = ta.crossunder(shortest, midshort)
+
+// Signal Long
+if cross_bull and price_above_longer
+    strategy.entry("Long", strategy.long, comment="Long Signal")
+if cross_bear
+    strategy.close("Long", comment="Exit Long")
+
+// Signal Short
+if cross_bear and price_below_longer
+    strategy.entry("Short", strategy.short, comment="Short Signal" )
+if cross_bull
+    strategy.close("Short", comment="Exit Short")
