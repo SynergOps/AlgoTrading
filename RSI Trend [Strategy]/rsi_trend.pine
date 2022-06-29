@@ -1,0 +1,28 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Salih Emin (cerebrux)
+
+//@version=5
+strategy('RSI Trend Strategy', overlay=true, default_qty_value = 100, default_qty_type = strategy.percent_of_equity, initial_capital = 1000)
+RSIperiod = input(title='rsi period', defval=5)
+RSIvalue = ta.rsi(close, RSIperiod)
+
+if RSIvalue < 30 and close > ta.sma(close, 100) and close < ta.sma(close, 30)
+    strategy.entry('long', strategy.long)
+
+SL = 0.10
+TP = 0.30
+
+longstop = strategy.position_avg_price * (1 - SL)
+longprofit = strategy.position_avg_price * (1 + TP)
+
+if strategy.position_size > 0
+    strategy.exit(id='close', stop=longstop, limit=longprofit)
+
+if RSIvalue > 60 and close < ta.sma(close, 100) and close > ta.sma(close, 30)
+    strategy.entry('short', strategy.short)
+
+shortstop = strategy.position_avg_price * (1 + SL)
+shortprofit = strategy.position_avg_price * (1 - TP)
+
+if strategy.position_size < 0
+    strategy.exit(id='close', stop=shortstop, limit=shortprofit)
