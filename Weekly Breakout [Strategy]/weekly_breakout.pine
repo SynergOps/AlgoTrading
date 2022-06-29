@@ -1,0 +1,31 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © Salih Emin (cerebrux)
+
+//@version=5
+
+strategy('Weekly Break out Strategy', overlay=true)
+
+// Defining Take profit and Stoploss as 4:1 Reaward to Risk ration
+SL = 0.10
+TP = 0.40
+
+// Long position signal
+if close > ta.highest(close[1], 20) and close > ta.sma(close, 130)
+    strategy.entry('long', strategy.long)
+
+
+longstop = strategy.position_avg_price * (1 - SL)
+longprofit = strategy.position_avg_price * (1 + TP)
+
+if strategy.position_size > 0
+    strategy.exit(id='close', stop=longstop, limit=longprofit)
+
+// Short position signal
+if close < ta.highest(close[1], 20) and close < ta.sma(close, 130)
+    strategy.entry('short', strategy.short)
+    
+shortstop = strategy.position_avg_price * (1 + SL)
+shortprofit = strategy.position_avg_price * (1 - TP)
+
+if strategy.position_size < 0
+    strategy.exit(id='close', stop=shortstop, limit=shortprofit)
