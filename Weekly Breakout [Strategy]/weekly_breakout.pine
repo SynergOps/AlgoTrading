@@ -3,7 +3,7 @@
 
 //@version=5
 
-strategy('Weekly Break out Strategy', overlay=true)
+strategy('Weekly Break out Strategy', overlay=true, default_qty_value = 100, default_qty_type = strategy.percent_of_equity, initial_capital = 1000)
 
 // Defining Take profit and Stoploss as 4:1 Reaward to Risk ration
 SL = 0.10
