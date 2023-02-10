@@ -1,0 +1,44 @@
+//@version=5
+// This script is distributed under the terms of the MIT License.
+// See https://opensource.org/licenses/MIT for more information.
+// © Salih Emin (cerebrux)
+
+indicator(title='Support & Resistance Levels with Break of Structure', shorttitle='Support & Resistance Levels with Break of Structure', overlay=true, max_bars_back=1000)
+
+// Define input parameters
+toggleBreaks = input(true, title='Show Stracture Breakers')
+leftBars = input(9, title='Left Bars')
+rightBars = input(9, title='Right Bars')
+volumeThreshold = input(26, title='Volume Threshold')
+
+// Calculate pivots
+higherPivot = fixnan(ta.pivothigh(leftBars, rightBars)[1])
+lowerPivot = fixnan(ta.pivotlow(leftBars, rightBars)[1])
+
+// Plot pivots
+plot(higherPivot, color=ta.change(higherPivot) ? na : #ff0000, linewidth=2, offset=-(rightBars + 1), title='Resistance Level')
+plot(lowerPivot, color=ta.change(lowerPivot) ? na : #00ff4c, linewidth=2, offset=-(rightBars + 1), title='Support Level')
+
+// Calculate volume_oscillator
+short_time_vol = ta.ema(volume, 9)
+long_time_vol = ta.ema(volume, 26)
+volume_oscillator = 100 * (short_time_vol - long_time_vol) / long_time_vol
+
+// Plot breaks with volume
+plotshape(toggleBreaks and ta.crossunder(close, lowerPivot) and not(open - close < high - open) and volume_oscillator > volumeThreshold, title='BEARISH Break of Structure', text='Bearish Break', style=shape.labeldown, location=location.abovebar, color=color.new(#fd0000, 0), textcolor=color.new(color.white, 0), size=size.tiny)
+plotshape(toggleBreaks and ta.crossover(close, higherPivot) and not(open - low > close - open) and volume_oscillator > volumeThreshold, title='BULLISH Break of Structure', text='Bullish Break', style=shape.labelup, location=location.belowbar, color=color.new(#00c40a, 0), textcolor=color.new(color.white, 0), size=size.tiny)
+
+// Plot bull / bearish wicks
+plotshape(toggleBreaks and ta.crossover(close, higherPivot) and open - low > close - open, title='Bullish Wick Break', text='Bullish Wick', style=shape.labelup, location=location.belowbar, color=color.new(#007c04, 0), textcolor=color.new(color.white, 0), size=size.tiny)
+plotshape(toggleBreaks and ta.crossunder(close, lowerPivot) and open - close < high - open, title='Bullish Wick Break', text='Bearish Wick', style=shape.labeldown, location=location.abovebar, color=color.new(#570000, 0), textcolor=color.new(color.white, 0), size=size.tiny)
+
+
+// Set up alerts for when the price reaches the support and resistance levels
+alertcondition(ta.crossunder(close, lowerPivot) or close == lowerPivot, title='Price at Support Level', message='Price at Support Level')
+alertcondition(ta.crossover(close, higherPivot) or close == higherPivot, title='Price at Resistance Level', message='Price at Resistance Level')
+
+// Set alerts for when the price breaks levels
+alertcondition(ta.crossunder(close, lowerPivot) and volume_oscillator > volumeThreshold, title='Support Level Broken', message='Support Level Broken')
+alertcondition(ta.crossover(close, higherPivot) and volume_oscillator > volumeThreshold, title='Resistance Level Broken', message='Resistance Level Broken')
+
+
