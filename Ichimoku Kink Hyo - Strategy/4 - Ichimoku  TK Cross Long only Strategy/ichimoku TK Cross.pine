@@ -34,7 +34,7 @@ ss_low = math.min(senkouA[Kumo_offset - 1], senkouB[Kumo_offset - 1])
 
 // Conditions for Long
 long_entry = input(true, title='Long Entry')
-tk_cross_bull = tenkan > kijun and (tenkan < senkouA or tenkan < senkouB )
+tk_cross_bull = tenkan > kijun
 
 // Conditions for exit
 tk_cross_bear = tenkan < kijun
