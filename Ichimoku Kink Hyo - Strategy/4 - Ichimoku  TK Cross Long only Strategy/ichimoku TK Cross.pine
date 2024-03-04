@@ -39,12 +39,12 @@ tk_cross_bull = tenkan > kijun
 // Conditions for exit
 tk_cross_bear = tenkan < kijun
 
-// Send email alert
+// Create Signal condition for buy
 if tk_cross_bull and long_entry
-    strategy.entry('Long', strategy.long,  alert_message = "Open Long Position" )
-    alert("Long entry signal", alert.freq_all)
+    strategy.entry(id = 'Buy', direction = strategy.long, alert_message = 'Open Long Position')
+    alert('Long entry signal', alert.freq_once_per_bar)
 
-// Send push notification
+// Create Signal condition for closing buy
 if tk_cross_bear and long_entry
-    strategy.close('Long', alert_message = "close Long Position" )
-    alert("Exit your position", alert.freq_all)
+    strategy.close(id = 'Buy', alert_message = 'Close Long Position')
+    alert('Exit your position', alert.freq_once_per_bar)

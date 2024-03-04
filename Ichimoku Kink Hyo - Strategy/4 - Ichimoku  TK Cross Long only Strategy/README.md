@@ -11,3 +11,4 @@ Long only Position:
 
 __NOTE:__ This strategy is only for daily timeframe. The exit signals refer to the entire position.
 This strategy incorporates alerts. Click on Alert menu in trading view and in the conditions dropdown select "Ichimoku Kinko Hyo: TK Cross Strategy (9, 26, 52, 26, 26)". Then select "alert() functions only. For expiration, just make sure that it is set in far future date. In the Notifications tab, select at least Email and Push notifications
+Alert Documentation: https://www.tradingview.com/chart/?solution=43000597494
