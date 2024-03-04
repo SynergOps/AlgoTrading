@@ -41,10 +41,10 @@ tk_cross_bear = tenkan < kijun
 
 // Send email alert
 if tk_cross_bull and long_entry
-    strategy.entry('Long', strategy.long, when=tk_cross_bull and long_entry)
-    alert("Long entry signal", alert.freq_once_per_bar_close)
+    strategy.entry('Long', strategy.long,  alert_message = "Open Long Position" )
+    alert("Long entry signal", alert.freq_all)
 
 // Send push notification
 if tk_cross_bear and long_entry
-    strategy.close('Long', when=tk_cross_bear and long_entry)
-    alert("Exit your position", alert.freq_once_per_bar_close)
+    strategy.close('Long', alert_message = "close Long Position" )
+    alert("Exit your position", alert.freq_all)
