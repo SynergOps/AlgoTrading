@@ -1,38 +1,17 @@
 // This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
-// © ZenAndTheArtOfTrading / www.PineScriptMastery.com
+// Based on © ZenAndTheArtOfTrading / www.PineScriptMastery.com
+// © Salih Emin (cerebrux)
 // 
-// This script is a momentum-based trading strategy that uses a higher timeframe EMA to determine
-// the strength of the prevailing trend. It also uses an ATR-based trailing stop to manage risk. 
-// 
-// The strategy is designed to be used on higher timeframes, and can be used on any asset class. 
-// It is designed to be used on the 4H timeframe and above, and is not suitable for lower timeframes.
-// 
-// The strategy has the following settings:
-// 1. Higher Timeframe: The higher timeframe EMA reference (Weekly 20 EMA is recommended)
-// 2. EMA Length: The period length for the EMA
-// 3. ATR Length: The period length for the ATR
-// 4. Trail Stop Source: The source for the trailing stop
-// 5. Trail Stop Lookback: How many bars to look back for the trailing price source
-// 6. Trailing Stop Ratchet Multiplier: When momentum is yellow (caution), shrink ATR distance for TS by this much
-// 7. Start Filter: Start date & time to begin searching for setups
-// 8. End Filter: End date & time to stop searching for setups
-// 
-// Entry Rules:
-// - The strategy enters a long position when the current price is above the higher timeframe EMA, and the momentum is strong
+//  Entry Rules:
+// - The strategy enters a long position when the current price is above the higher timeframe EMA, and the momentum is strong with Tenkan-Sen crossing above Kijun-Sen
 // - The strategy does not enter a long position if the momentum is yellow (caution)
 //      -> Caution: True if recent swing minus its current low is greater than 1.5 times the ATR, or if the close price is below the Daily EMA
-// - Training stop: Stop is trailed 1 ATR below the highest high or 20% of ATR if momentum is yellow (caution)
-// 
-// @version=5
-strategy("Bitcoin Momentum Strategy", 
-     overlay=true, 
-     initial_capital=1000, 
-     currency=currency.USDT,
-     default_qty_type=strategy.percent_of_equity, 
-     default_qty_value=100,
-     commission_type=strategy.commission.percent,
-     commission_value=0.1)
+// - Training stop: Stop is trailed 1 ATR below the highest high or 20% of ATR if momentum is yellow (caution) or if Tenkan-Sen crosses below Kijun-Sen
+// - Stop Loss: 10% below the entry price
+//@version=5
+strategy('Ichimoku Kinko Hyo Momentum Strategy', overlay=true,	initial_capital = 100,	currency=currency.USDT,	default_qty_type = strategy.percent_of_equity,	default_qty_value = 100, commission_type=strategy.commission.percent, commission_value=0.08) // Based on Binance commision on Spot accounts
 
+//Inputs
 // Get user input
 var const string    G_STRATEGY  = "Strategy Entry Settings"
 var const string    G_EXIT      = "Strategy Exit Settings"
@@ -41,9 +20,14 @@ i_HigherTimeframe   = input.timeframe("W", "Higher Timeframe", group=G_STRATEGY,
 i_EmaLength         = input.int(20, "EMA Length", group=G_STRATEGY, tooltip="Moving average period length")
 i_AtrLength         = input.int(5, "ATR Length", group=G_STRATEGY, tooltip="ATR period length")
 i_TrailStopSource   = input.source(low, "Trail Stop Source", group=G_EXIT, tooltip="Lowest price source for trailing stop")
+i_persent_diff = input.int(10, "Stop Loss percentage", group=G_EXIT, tooltip="What persentage whould your Stop Loss be")
 i_TrailStopLookback = input.int(7, "Trail Stop Lookback", group=G_EXIT, tooltip="How many bars to look back for trailing price source")
+
+// Risk Management
+stop_loss = (1 - i_persent_diff / 100.) * close
+
 i_TrailStopMulti    = input.float(0.2, "Trailing Stop Ratchet Multiplier", group=G_EXIT, tooltip="When momentum is yellow (caution), shrink ATR distance for TS by this much")
-i_StartTime         = input.time(timestamp("01 Jan 2000 13:30 +0000"), "Start Filter", group=G_FILTER, tooltip="Start date & time to begin searching for setups")
+i_StartTime         = input.time(timestamp("09 Jan 2009 13:30 +0000"), "Start Filter", group=G_FILTER, tooltip="BTC release Date: Start date & time to begin searching for setups")
 i_EndTime           = input.time(timestamp("1 Jan 2099 19:30 +0000"), "End Filter", group=G_FILTER, tooltip="End date & time to stop searching for setups")
 
 // Define custom security function which does not repaint
@@ -71,23 +55,62 @@ if isBullish[1]
 if isCaution[1]
     bgCol := color.orange
 
-// Handle strategy entry, and reset trailing stop
+Tenkan_sen = input.int(9, minval=1, title='Tenkan-Sen')
+Kijun_sen = input.int(26, minval=1, title='Kijun-Sen')
+Senku_spanB = input.int(52, minval=1, title='Senkou-Span B')
+Chiku_span_offset = input.int(26, minval=1, title='Chikou-Span Offset')
+Kumo_offset = input.int(26, minval=1, title='Kumo Offset')
+
+middle(len) => math.avg(ta.lowest(len), ta.highest(len))
+
+// Ichimoku Components
+tenkan = middle(Tenkan_sen)
+kijun = middle(Kijun_sen)
+senkouA = math.avg(tenkan, kijun)
+senkouB = middle(Senku_spanB)
+
+// Plot Ichimoku Kinko Hyo
+plot(tenkan, color=color.new(#04ff19, 0), title='Tenkan-Sen',display=display.none)
+plot(kijun, color=color.new(#991515, 0), title='Kijun-Sen')
+plot(close, offset=-Chiku_span_offset + 1, color=color.new(#459915, 0), title='Chikou-Span', display=display.none)
+senkouAplot = plot(senkouA, offset=Kumo_offset - 1, color=color.new(color.green, 0), title='Senkou-Span A', display=display.none)
+senkouBplot = plot(senkouB, offset=Kumo_offset - 1, color=color.new(color.red, 0), title='Senkou-Span B', display=display.none)
+fill(senkouAplot, senkouBplot, color = senkouA > senkouB ? color.rgb(67, 160, 71, 90) : color.rgb(244, 67, 54, 90), title='Cloud color', display=display.none)
+
+ss_high = math.max(senkouA[Kumo_offset - 1], senkouB[Kumo_offset - 1])
+ss_low = math.min(senkouA[Kumo_offset - 1], senkouB[Kumo_offset - 1])
+
+// Entry Signals
 var float trailStop = na
-if isBullish and strategy.position_size == 0 and DateFilter(i_StartTime, i_EndTime) and not isCaution
-    strategy.entry(id="Buy", direction=strategy.long)
+// Conditions for Long
+long_entry = input(true, title='Long Entry')
+tk_cross_bull = tenkan > kijun
+
+// Conditions for exit
+tk_cross_bear = tenkan < kijun
+
+// Create Signal condition for buy
+
+if tk_cross_bull and isBullish and strategy.position_size == 0 and DateFilter(i_StartTime, i_EndTime) and not isCaution and long_entry
+    strategy.entry(id = 'Buy', direction = strategy.long, alert_message = 'Open Long Position')
+    alert('Long entry signal', alert.freq_once_per_bar)
     trailStop := na
+
 
 // Update trailing stop
 float temp_trailStop = ta.highest(i_TrailStopSource, i_TrailStopLookback) - (isCaution[1] ? atrValue * i_TrailStopMulti : atrValue)
 if strategy.position_size > 0
     if temp_trailStop > trailStop or na(trailStop)
-        trailStop := temp_trailStop
+        trailStop := temp_trailStop    
 
-// Handle strategy exit
-if (close < trailStop or close < htfEmaValue) and barstate.isconfirmed
-    strategy.close("Buy", comment="Sell")
+// Create Signal condition for closing buy
+if (close < trailStop or close < htfEmaValue and tk_cross_bear) and barstate.isconfirmed and long_entry // and tk_cross_bear  
+    strategy.close(id = 'Buy', alert_message = 'Close Long Position')
+    alert('Exit your position', alert.freq_once_per_bar)
+
+strategy.exit('Stop Loss', 'Buy', stop = stop_loss)
 
 // Draw trailing stop, HTF EMA and color-coded momentum indicator
 plotshape(true, color=bgCol, style=shape.square, location=location.bottom, size=size.auto, title="Momentum Strength")
-plot(htfEmaValue, color=close > htfEmaValue ? color.green : color.red, linewidth=2, title="HTF EMA")
-plot(strategy.position_size[1] > 0 ? trailStop : na, style=plot.style_linebr, color=color.red, title="Stop Loss")
+plot(htfEmaValue, color=close > htfEmaValue ? color.green : color.red, linewidth=2, title="HTF EMA", display=display.none)
+plot(strategy.position_size[1] > 0 ? trailStop : na, style=plot.style_steplinebr, color=color.yellow, title="Stop Loss")
