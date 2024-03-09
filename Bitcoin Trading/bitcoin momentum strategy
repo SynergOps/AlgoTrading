@@ -107,8 +107,8 @@ if strategy.position_size > 0
 if (close < trailStop or close < htfEmaValue and tk_cross_bear) and barstate.isconfirmed and long_entry // and tk_cross_bear  
     strategy.close(id = 'Buy', alert_message = 'Close Long Position')
     alert('Exit your position', alert.freq_once_per_bar)
-
-strategy.exit('Stop Loss', 'Buy', stop = stop_loss)
+else
+    strategy.exit('Stop Loss', 'Buy', stop = stop_loss)
 
 // Draw trailing stop, HTF EMA and color-coded momentum indicator
 plotshape(true, color=bgCol, style=shape.square, location=location.bottom, size=size.auto, title="Momentum Strength")
