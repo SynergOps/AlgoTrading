@@ -109,6 +109,7 @@ if (close < trailStop or close < htfEmaValue and tk_cross_bear) and barstate.isc
     alert('Exit your position', alert.freq_once_per_bar)
 else
     strategy.exit('Stop Loss', 'Buy', stop = stop_loss)
+    alert('Stop Loss Hit', alert.freq_once_per_bar)
 
 // Draw Trail Profit, HTF EMA and color-coded momentum indicator
 plotshape(true, color=bgCol, style=shape.square, location=location.bottom, size=size.auto, title="Momentum Strength")
