@@ -1,6 +1,6 @@
 ## BTC Ichimoku Momentum Strategy
 
-__version 3.3.1__
+__version v3.3.2__
 
 This strategy is developed for swing trading on BTC spot accounts. Thus, use it only for buying and holding it until the exit signal tells you to sell your entire position. The main advantage of this system in my opinion is in limiting the max drawdown significantly versus buy & hodl. Theoretically much better returns can be made by just holding, but that's also a good way to lose 70%+ of your capital in the inevitable bear markets (also speaking from experience). In saying all of that, the future is fundamentally unknowable and past results in no way guarantee future performance.
 Last but not least, the code also incorporates alerts and a monthly view of performance based on the results of the closing trades
