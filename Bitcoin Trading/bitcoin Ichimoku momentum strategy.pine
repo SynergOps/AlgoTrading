@@ -102,8 +102,8 @@ if strategy.position_size > 0
 
 // Handle strategy exit
 if ((close < trailStop or close < htfEmaValue and tk_cross_bear) and barstate.isconfirmed) or (i_ExitOnLastBar and barstate.islastconfirmedhistory)
-    strategy.close(id = 'Buy', comment = 'Exit on Open' ,alert_message = 'Close Long Position')
-    alert('Exit your position', alert.freq_once_per_bar)
+    strategy.close(id = 'Buy', comment = 'Trailing Hit - Exit on Open' ,alert_message = 'Close Long Position')
+    alert('Traling Take Profit hit. Exit your position', alert.freq_once_per_bar)
 
 if (close < stop_loss) and barstate.isconfirmed and long_entry
     strategy.exit('Stop Loss', 'Buy', stop = stop_loss)
