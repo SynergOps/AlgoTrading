@@ -11,7 +11,7 @@
 //@version=5
 strategy('Ichimoku Kinko Hyo Momentum Strategy', overlay=true,	initial_capital = 100,	currency=currency.USDT,	default_qty_type = strategy.percent_of_equity,	default_qty_value = 100, commission_type=strategy.commission.percent, commission_value=0.08) // Based on Binance commision on Spot accounts
 
-//Inputs
+
 // Get user input
 var const string    G_STRATEGY  = "Strategy Entry Settings"
 var const string    G_EXIT      = "Strategy Exit Settings"
@@ -20,15 +20,18 @@ i_HigherTimeframe   = input.timeframe("W", "Higher Timeframe", group=G_STRATEGY,
 i_EmaLength         = input.int(20, "EMA Length", group=G_STRATEGY, tooltip="Moving average period length")
 i_AtrLength         = input.int(5, "ATR Length", group=G_STRATEGY, tooltip="ATR period length")
 i_TrailStopSource   = input.source(low, "Trail Profit Source", group=G_EXIT, tooltip="Lowest price source for Trail Profit")
-i_persent_diff = input.int(6, "Stop Loss percentage", group=G_EXIT, tooltip="What persentage whould your Stop Loss be")
 i_TrailStopLookback = input.int(7, "Trail Profit Lookback", group=G_EXIT, tooltip="How many bars to look back for trailing price source")
-
-// Risk Management
-stop_loss = strategy.position_avg_price * (1 - i_persent_diff / 100)
-
 i_TrailStopMulti    = input.float(0.2, "Trail Profit Ratchet Multiplier", group=G_EXIT, tooltip="When momentum is yellow (caution), shrink ATR distance for TS by this much")
+i_ExitOnLastBar     = input.bool(false, "Exit On Last Historical Bar", group=G_EXIT, tooltip="Purely for backtesting and to include the current open position in the stats")
 i_StartTime         = input.time(timestamp("09 Jan 2009 13:30 +0000"), "Start Filter", group=G_FILTER, tooltip="BTC release Date: Start date & time to begin searching for setups")
 i_EndTime           = input.time(timestamp("1 Jan 2099 19:30 +0000"), "End Filter", group=G_FILTER, tooltip="End date & time to stop searching for setups")
+
+// Risk Management
+i_persent_diff = input.int(6, "Stop Loss percentage", group=G_EXIT, tooltip="What persentage whould your Stop Loss be")
+stop_loss = strategy.position_avg_price * (1 - i_persent_diff / 100)
+
+
+
 
 // Define custom security function which does not repaint
 RequestSecurity_NonRP(_market, _res, _exp) => request.security(_market, _res, _exp[barstate.isrealtime ? 1 : 0])[barstate.isrealtime ? 0 : 1]
@@ -43,13 +46,13 @@ float   htfEmaValue = RequestSecurity_NonRP(syminfo.tickerid, i_HigherTimeframe,
 
 // Check if trading timeframe price is above higher timeframe EMA
 float   marketPrice = close
-bool    isBullish   = marketPrice > htfEmaValue //+ (atrValue * 0.25)
 
-// Check for bearish volatility caution
-bool    isCaution   = isBullish and (ta.highest(high, 7) - low > (atrValue * 1.5) or close < emaValue) 
+// Check for bullishness / bearish volatility caution
+bool    isBullish   = marketPrice > htfEmaValue
+bool    isCaution   = isBullish and (ta.highest(high, 7) - low > (atrValue * 1.5) or marketPrice < emaValue) 
 
 // Set momentum color
-color   bgCol = color.red
+color bgCol = color.red
 if isBullish[1]
     bgCol := color.green
 if isCaution[1]
@@ -79,32 +82,26 @@ fill(senkouAplot, senkouBplot, color = senkouA > senkouB ? color.rgb(67, 160, 71
 
 ss_high = math.max(senkouA[Kumo_offset - 1], senkouB[Kumo_offset - 1])
 ss_low = math.min(senkouA[Kumo_offset - 1], senkouB[Kumo_offset - 1])
-
-// Entry Signals
-var float trailStop = na
-// Conditions for Long
-long_entry = input(true, title='Long Entry')
 tk_cross_bull = tenkan > kijun
 
 // Conditions for exit
 tk_cross_bear = tenkan < kijun
 
-// Create Signal condition for buy
-
-if tk_cross_bull and isBullish and strategy.position_size == 0 and DateFilter(i_StartTime, i_EndTime) and not isCaution and long_entry
+// Handle strategy entry, and reset trailing stop
+var float trailStop = na
+if tk_cross_bull and isBullish and strategy.position_size == 0 and DateFilter(i_StartTime, i_EndTime) and not isCaution
     strategy.entry(id = 'Buy', direction = strategy.long, comment = "Enter on Open", alert_message = 'Open Long Position')
     alert('Long entry signal', alert.freq_once_per_bar)
     trailStop := na
-
 
 // Update Trail Profit
 float temp_trailStop = ta.highest(i_TrailStopSource, i_TrailStopLookback) - (isCaution[1] ? atrValue * i_TrailStopMulti : atrValue)
 if strategy.position_size > 0
     if temp_trailStop > trailStop or na(trailStop)
-        trailStop := temp_trailStop    
+        trailStop := temp_trailStop
 
-// Create Signal condition for closing buy
-if (close < trailStop or close < htfEmaValue and tk_cross_bear) and barstate.isconfirmed and long_entry // and tk_cross_bear  
+// Handle strategy exit
+if ((close < trailStop or close < htfEmaValue and tk_cross_bear) and barstate.isconfirmed) or (i_ExitOnLastBar and barstate.islastconfirmedhistory)
     strategy.close(id = 'Buy', comment = 'Exit on Open' ,alert_message = 'Close Long Position')
     alert('Exit your position', alert.freq_once_per_bar)
 
@@ -115,6 +112,7 @@ if (close < stop_loss) and barstate.isconfirmed and long_entry
 // Draw Trail Profit, HTF EMA and color-coded momentum indicator
 plotshape(true, color=bgCol, style=shape.square, location=location.bottom, size=size.auto, title="Momentum Strength")
 plot(htfEmaValue, color=close > htfEmaValue ? color.green : color.red, linewidth=2, title="HTF EMA", display=display.none)
+plot(emaValue, color=close > emaValue ? color.green : color.red, linewidth=1, title="CTF EMA", display=display.none)
 plot(strategy.position_size[1] > 0 ? trailStop : na, style=plot.style_steplinebr, color=color.yellow, title="Trailing Take Profit")
 plot(strategy.position_size[1] > 0 ? stop_loss : na, style=plot.style_steplinebr, color=color.rgb(250, 0, 0), title="Stop Loss")
 //-------------------------------------------------------------------------//
