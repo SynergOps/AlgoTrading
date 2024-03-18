@@ -9,7 +9,7 @@
 // - Training stop: Stop is trailed 1 ATR below the highest high or 20% of ATR if momentum is yellow (caution) or if Tenkan-Sen crosses below Kijun-Sen
 // - Stop Loss: 10% below the entry price
 //@version=5
-strategy('Ichimoku Kinko Hyo Momentum Strategy v3.3.2', overlay=true,	initial_capital = 100,	currency=currency.USDT,	default_qty_type = strategy.percent_of_equity,	default_qty_value = 100, commission_type=strategy.commission.percent, commission_value=0.08) // Based on Binance commision on Spot accounts
+strategy('Ichimoku Kinko Hyo Momentum Strategy v3.3.3', overlay=true,	initial_capital = 100,	currency=currency.USDT,	default_qty_type = strategy.percent_of_equity,	default_qty_value = 100, commission_type=strategy.commission.percent, commission_value=0.08) // Based on Binance commision on Spot accounts
 
 
 // Get user input
@@ -105,7 +105,7 @@ if ((close < trailStop or close < htfEmaValue and tk_cross_bear) and barstate.is
     strategy.close(id = 'Buy', comment = 'Trailing Hit - Exit on Open' ,alert_message = 'Close Long Position')
     alert('Traling Take Profit hit. Exit your position', alert.freq_once_per_bar)
 
-if (close < stop_loss) and barstate.isconfirmed and long_entry
+if (close < stop_loss) and barstate.isconfirmed
     strategy.exit('Stop Loss', 'Buy', stop = stop_loss)
     alert('Stop Loss Hit', alert.freq_once_per_bar)
 
