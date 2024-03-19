@@ -69,14 +69,6 @@ kijun = middle(Kijun_sen)
 senkouA = math.avg(tenkan, kijun)
 senkouB = middle(Senku_spanB)
 
-// Plot Ichimoku Kinko Hyo
-plot(tenkan, color=color.new(#04ff19, 0), title='Tenkan-Sen',display=display.none)
-plot(kijun, color=color.new(#991515, 0), title='Kijun-Sen')
-plot(close, offset=-Chiku_span_offset + 1, color=color.new(#459915, 0), title='Chikou-Span', display=display.none)
-senkouAplot = plot(senkouA, offset=Kumo_offset - 1, color=color.new(color.green, 0), title='Senkou-Span A', display=display.none)
-senkouBplot = plot(senkouB, offset=Kumo_offset - 1, color=color.new(color.red, 0), title='Senkou-Span B', display=display.none)
-fill(senkouAplot, senkouBplot, color = senkouA > senkouB ? color.rgb(67, 160, 71, 90) : color.rgb(244, 67, 54, 90), title='Cloud color', display=display.none)
-
 ss_high = math.max(senkouA[Kumo_offset - 1], senkouB[Kumo_offset - 1])
 ss_low = math.min(senkouA[Kumo_offset - 1], senkouB[Kumo_offset - 1])
 tk_cross_bull = tenkan > kijun
@@ -101,6 +93,7 @@ if strategy.position_size > 0
 if ((close < trailStop or close < htfEmaValue and tk_cross_bear) and barstate.isconfirmed) or (i_ExitOnLastBar and barstate.islastconfirmedhistory)
     strategy.close(id = 'Buy', comment = 'Trailing Hit - Exit on Open' ,alert_message = 'Close Long Position')
     alert('Traling Take Profit hit. Exit your position at $' + str.tostring(close), alert.freq_once_per_bar_close)
+    
 
 if (close < stop_loss) and barstate.isconfirmed
     strategy.exit('Stop Loss', 'Buy', stop = stop_loss)
@@ -112,6 +105,15 @@ plot(htfEmaValue, color=close > htfEmaValue ? color.green : color.red, linewidth
 plot(emaValue, color=close > emaValue ? color.green : color.red, linewidth=1, title="CTF EMA", display=display.none)
 plot(strategy.position_size[1] > 0 ? trailStop : na, style=plot.style_steplinebr, color=color.yellow, title="Trailing Take Profit")
 plot(strategy.position_size[1] > 0 ? stop_loss : na, style=plot.style_steplinebr, color=color.rgb(250, 0, 0), title="Stop Loss")
+
+// Plot Ichimoku Kinko Hyo
+plot(tenkan, color=color.new(#04ff19, 0), title='Tenkan-Sen',display=display.none)
+plot(kijun, color=color.new(#991515, 0), title='Kijun-Sen')
+plot(close, offset=-Chiku_span_offset + 1, color=color.new(#459915, 0), title='Chikou-Span', display=display.none)
+senkouAplot = plot(senkouA, offset=Kumo_offset - 1, color=color.new(color.green, 0), title='Senkou-Span A', display=display.none)
+senkouBplot = plot(senkouB, offset=Kumo_offset - 1, color=color.new(color.red, 0), title='Senkou-Span B', display=display.none)
+fill(senkouAplot, senkouBplot, color = senkouA > senkouB ? color.rgb(67, 160, 71, 90) : color.rgb(244, 67, 54, 90), title='Cloud color', display=display.none)
+
 //-------------------------------------------------------------------------//
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
