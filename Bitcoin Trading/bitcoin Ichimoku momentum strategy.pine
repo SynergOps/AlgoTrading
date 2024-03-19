@@ -90,15 +90,14 @@ if strategy.position_size > 0
         trailStop := temp_trailStop
 
 // Handle strategy exit
-if ((close < trailStop or close < htfEmaValue and tk_cross_bear) and barstate.isconfirmed) or (i_ExitOnLastBar and barstate.islastconfirmedhistory)
+if strategy.position_size > 0 and ((close < trailStop or close < htfEmaValue and tk_cross_bear) and barstate.isconfirmed) or (i_ExitOnLastBar and barstate.islastconfirmedhistory)
     strategy.close(id = 'Buy', comment = 'Trailing Hit - Exit on Open' ,alert_message = 'Close Long Position')
     alert('Traling Take Profit hit. Exit your position at $' + str.tostring(close), alert.freq_once_per_bar_close)
     
-
-if (close < stop_loss) and barstate.isconfirmed
+if strategy.position_size > 0 and (close < stop_loss) and barstate.isconfirmed
     strategy.exit('Stop Loss', 'Buy', stop = stop_loss)
     alert('Stop Loss Hit at $' + str.tostring(close), alert.freq_once_per_bar_close)
-
+    
 // Draw Trail Profit, HTF EMA and color-coded momentum indicator
 plotshape(true, color=bgCol, style=shape.square, location=location.bottom, size=size.auto, title="Momentum Strength")
 plot(htfEmaValue, color=close > htfEmaValue ? color.green : color.red, linewidth=2, title="HTF EMA", display=display.none)
