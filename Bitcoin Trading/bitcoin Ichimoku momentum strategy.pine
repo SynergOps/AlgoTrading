@@ -9,7 +9,7 @@
 // - Training stop: Stop is trailed 1 ATR below the highest high or 20% of ATR if momentum is yellow (caution) or if Tenkan-Sen crosses below Kijun-Sen
 // - Stop Loss: 10% below the entry price
 //@version=5
-strategy('Ichimoku Kinko Hyo Momentum Strategy v3.3.3', overlay=true,	initial_capital = 100,	currency=currency.USDT,	default_qty_type = strategy.percent_of_equity,	default_qty_value = 100, commission_type=strategy.commission.percent, commission_value=0.08) // Based on Binance commision on Spot accounts
+strategy('Ichimoku Kinko Hyo Momentum Strategy v3.4.0', overlay=true,	initial_capital = 100,	currency=currency.USDT,	default_qty_type = strategy.percent_of_equity,	default_qty_value = 100, commission_type=strategy.commission.percent, commission_value=0.08) // Based on Binance commision on Spot accounts
 
 
 // Get user input
@@ -29,9 +29,6 @@ i_EndTime           = input.time(timestamp("1 Jan 2099 19:30 +0000"), "End Filte
 // Risk Management
 i_persent_diff = input.int(6, "Stop Loss percentage", group=G_EXIT, tooltip="What persentage whould your Stop Loss be")
 stop_loss = strategy.position_avg_price * (1 - i_persent_diff / 100)
-
-
-
 
 // Define custom security function which does not repaint
 RequestSecurity_NonRP(_market, _res, _exp) => request.security(_market, _res, _exp[barstate.isrealtime ? 1 : 0])[barstate.isrealtime ? 0 : 1]
@@ -91,7 +88,7 @@ tk_cross_bear = tenkan < kijun
 var float trailStop = na
 if tk_cross_bull and isBullish and strategy.position_size == 0 and DateFilter(i_StartTime, i_EndTime) and not isCaution
     strategy.entry(id = 'Buy', direction = strategy.long, comment = "Enter on Open", alert_message = 'Open Long Position')
-    alert('Long entry signal', alert.freq_once_per_bar)
+    alert('Long entry signal at $' + str.tostring(close), alert.freq_once_per_bar_close)
     trailStop := na
 
 // Update Trail Profit
@@ -103,11 +100,11 @@ if strategy.position_size > 0
 // Handle strategy exit
 if ((close < trailStop or close < htfEmaValue and tk_cross_bear) and barstate.isconfirmed) or (i_ExitOnLastBar and barstate.islastconfirmedhistory)
     strategy.close(id = 'Buy', comment = 'Trailing Hit - Exit on Open' ,alert_message = 'Close Long Position')
-    alert('Traling Take Profit hit. Exit your position', alert.freq_once_per_bar)
+    alert('Traling Take Profit hit. Exit your position at $' + str.tostring(close), alert.freq_once_per_bar_close)
 
 if (close < stop_loss) and barstate.isconfirmed
     strategy.exit('Stop Loss', 'Buy', stop = stop_loss)
-    alert('Stop Loss Hit', alert.freq_once_per_bar)
+    alert('Stop Loss Hit at $' + str.tostring(close), alert.freq_once_per_bar_close)
 
 // Draw Trail Profit, HTF EMA and color-coded momentum indicator
 plotshape(true, color=bgCol, style=shape.square, location=location.bottom, size=size.auto, title="Momentum Strength")
