@@ -9,7 +9,7 @@
 // - Training stop: Stop is trailed 1 ATR below the highest high or 20% of ATR if momentum is yellow (caution) or if Tenkan-Sen crosses below Kijun-Sen
 // - Stop Loss: 10% below the entry price
 //@version=5
-strategy('Ichimoku Kinko Hyo Momentum Strategy v3.4.2', overlay=true,	initial_capital = 100,	currency=currency.USDT,	default_qty_type = strategy.percent_of_equity,	default_qty_value = 100, commission_type=strategy.commission.percent, commission_value=0.08) // Based on Binance commision on Spot accounts
+strategy('Ichimoku Kinko Hyo Momentum Strategy v3.5.0', overlay=true,	initial_capital = 100,	currency=currency.USDT,	default_qty_type = strategy.percent_of_equity,	default_qty_value = 100, commission_type=strategy.commission.percent, commission_value=0.08) // Based on Binance commision on Spot accounts
 
 
 // Get user input
@@ -79,7 +79,7 @@ tk_cross_bear = tenkan < kijun
 // Handle strategy entry, and reset trailing stop
 var float trailStop = na
 if tk_cross_bull and isBullish and strategy.position_size == 0 and DateFilter(i_StartTime, i_EndTime) and not isCaution
-    strategy.entry(id = 'Buy', direction = strategy.long, comment = "Enter on Open", alert_message = 'Open Long Position')
+    strategy.entry(id = 'Buy', direction = strategy.long, comment = "Enter on Open price: $"+str.tostring(close), alert_message = 'Open Long Position')
     alert('Long entry signal at $' + str.tostring(close), alert.freq_once_per_bar_close)
     trailStop := na
 
@@ -91,7 +91,7 @@ if strategy.position_size > 0
 
 // Handle strategy exit
 if strategy.position_size > 0 and ((close < trailStop or close < htfEmaValue and tk_cross_bear) and barstate.isconfirmed) or (i_ExitOnLastBar and barstate.islastconfirmedhistory)
-    strategy.close(id = 'Buy', comment = 'Trailing Hit - Exit on Open' ,alert_message = 'Close Long Position')
+    strategy.close(id = 'Buy', comment = 'Trailing Hit - Exit on Open price: $'+str.tostring(close) ,alert_message = 'Close Long Position')
     alert('Traling Take Profit hit. Exit your position at $' + str.tostring(close), alert.freq_once_per_bar_close)
     
 if strategy.position_size > 0 and (close < stop_loss) and barstate.isconfirmed
