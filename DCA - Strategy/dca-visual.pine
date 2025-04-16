@@ -7,6 +7,8 @@ dcaInterval = input.string("Monthly", "Investment Frequency", options=["Daily", 
 startDate = input.time(timestamp("2020-04-01 00:00 +0000"), "Start Date")
 endDate = input.time(timestamp("2025-04-01 00:00 +0000"), "End Date")
 tradingFeePercent = input.float(0.1, "Trading Fee (%)", minval=0, tooltip="Enter the trading fee as a percentage, e.g. 0.1 for Binance Maker Fee")
+// includeFeesInBuyAndHold = input.bool(true, "Include Fees in Buy & Hold Calculation", tooltip="Apply the same trading fee to the Buy & Hold strategy to better compare against DCA.")
+
 
 
 // === Investment Logic ===
@@ -17,7 +19,8 @@ var float maxDrawdown = 0
 var float drawdownStartPrice = na
 var float[] dailyReturns = array.new_float()
 var float initialPrice = na
-var float buyAndHoldUnits = 0
+//var float buyAndHoldUnits = 0
+//var float buyAndHoldFees = 0
 var float totalInvestmentAmount = 0
 var float totalFeesPaid = 0
 
@@ -47,7 +50,8 @@ canInvest = time >= startDate and time <= endDate and isInvestmentTime
 // Initialize Buy and Hold at the first bar after start date
 if time >= startDate and time <= endDate and na(initialPrice) and close > 0
     initialPrice := close
-    buyAndHoldUnits := totalInvestmentAmount / initialPrice
+    // buyAndHoldFees := includeFeesInBuyAndHold ? totalInvestmentAmount * tradingFeePercent / 100 : 0
+    // buyAndHoldUnits := (totalInvestmentAmount - buyAndHoldFees) / initialPrice
 
 if canInvest and close > 0
     fee = investmentAmount * tradingFeePercent / 100
@@ -65,9 +69,10 @@ profit = currentValue - totalInvested
 roi = totalInvested > 0 ? (profit / totalInvested) * 100 : na
 
 // Buy and Hold calculations
-buyAndHoldValue = buyAndHoldUnits * close
-buyAndHoldProfit = buyAndHoldValue - totalInvestmentAmount
-buyAndHoldROI = totalInvestmentAmount > 0 ? (buyAndHoldProfit / totalInvestmentAmount) * 100 : na
+// totalBuyAndHoldCost = totalInvestmentAmount + (includeFeesInBuyAndHold ? buyAndHoldFees : 0)
+// buyAndHoldValue = buyAndHoldUnits * close
+// buyAndHoldProfit = buyAndHoldValue - totalBuyAndHoldCost
+// buyAndHoldROI = totalBuyAndHoldCost > 0 ? (buyAndHoldProfit / totalBuyAndHoldCost) * 100 : na
 
 // Calculate drawdown
 drawdown = maxEquity > 0 ? (currentValue - maxEquity) / maxEquity * 100 : 0
@@ -184,88 +189,88 @@ showROI = input.bool(true, title="Show ROI", tooltip="The Return on Investment (
 showMaxDrawdown = input.bool(true, title="Show Max Drawdown", tooltip="The Max Drawdown measures the largest peak-to-trough decline in value during the strategy's operation, showing the maximum risk taken in the worst period.")
 
 // === TABLE ===
-var table statsTable = table.new(position.top_right, 3, 15, border_width=1)
+var table statsTable = table.new(position.top_right, 3, 15, border_width=2)
 
 if bar_index % 10 == 0 or na(bar_index)
     // Table Headers
     table.cell(statsTable, 0, 0, "📊 Strategy", text_color=color_white, bgcolor=color_navy, text_halign=text.align_center)
     table.cell(statsTable, 1, 0, "DCA", text_color=color_white, bgcolor=color_navy, text_halign=text.align_center)
-    table.cell(statsTable, 2, 0, "Buy & Hold", text_color=color_white, bgcolor=color_navy, text_halign=text.align_center)
+    // table.cell(statsTable, 2, 0, "Buy & Hold", text_color=color_white, bgcolor=color_navy, text_halign=text.align_center)
 
     // Total Invested
     if showTotalInvested
         table.cell(statsTable, 0, 1, "💵 Total Invested", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 1, str.tostring(totalInvested, format.mintick), text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 2, 1, str.tostring(totalInvestmentAmount, format.mintick), text_color=color_white, bgcolor=color_gray)
+        // table.cell(statsTable, 2, 1, str.tostring(totalInvestmentAmount, format.mintick), text_color=color_white, bgcolor=color_gray)
 
     // Fees Paid
     if showFeesPaid
         table.cell(statsTable, 0, 2, "💸 Fees Paid", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 2, str.tostring(totalFeesPaid, format.mintick), text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 2, 2, "N/A", text_color=color_white, bgcolor=color_gray)
+        // table.cell(statsTable, 2, 2, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Net Cost for Units
     if showNetCostPerUnit
         table.cell(statsTable, 0, 3, "💲 Net Cost / Units", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 3, str.tostring(totalInvested - totalFeesPaid, format.mintick), text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 2, 3, "N/A", text_color=color_white, bgcolor=color_gray)
+        // table.cell(statsTable, 2, 3, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Total Units
     if showTotalUnits
         table.cell(statsTable, 0, 4, "🪙 Total Units", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 4, str.tostring(totalUnits, format.mintick), text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 2, 4, str.tostring(buyAndHoldUnits, format.mintick), text_color=color_white, bgcolor=color_gray)
+        //table.cell(statsTable, 2, 4, str.tostring(buyAndHoldUnits, format.mintick), text_color=color_white, bgcolor=color_gray)
 
     // Current Value
     if showCurrentValue
         table.cell(statsTable, 0, 5, "📈 Current Value", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 5, str.tostring(currentValue, format.mintick), text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 2, 5, str.tostring(buyAndHoldValue, format.mintick), text_color=color_white, bgcolor=color_gray)
+        // table.cell(statsTable, 2, 5, str.tostring(buyAndHoldValue, format.mintick), text_color=color_white, bgcolor=color_gray)
 
     // Profit
     if showProfit
         table.cell(statsTable, 0, 6, "💰 Profit", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 6, str.tostring(profit, format.mintick), text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 2, 6, str.tostring(buyAndHoldProfit, format.mintick), text_color=color_white, bgcolor=color_gray)
+        // table.cell(statsTable, 2, 6, str.tostring(buyAndHoldProfit, format.mintick), text_color=color_white, bgcolor=color_gray)
 
     // ROI
     if showROI
         table.cell(statsTable, 0, 7, "📊 ROI", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 7, str.tostring(roi, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 2, 7, str.tostring(buyAndHoldROI, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
+        // table.cell(statsTable, 2, 7, str.tostring(buyAndHoldROI, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
 
     // Max Drawdown
     if showMaxDrawdown
         table.cell(statsTable, 0, 8, "📉 Max Drawdown", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 8, str.tostring(maxDrawdown, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 2, 8, "N/A", text_color=color_white, bgcolor=color_gray)
+        // table.cell(statsTable, 2, 8, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Only show Sharpe Ratio if enabled
     if showSharpeRatio
         table.cell(statsTable, 0, 9, "📊 Sharpe Ratio", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 9, str.tostring(sharpeRatio, "#.##"), text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 2, 9, "N/A", text_color=color_white, bgcolor=color_gray)
+        // table.cell(statsTable, 2, 9, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Only show Sortino Ratio if enabled
     if showSortinoRatio
         table.cell(statsTable, 0, 10, "📊 Sortino Ratio", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 10, str.tostring(sortinoRatio, "#.##"), text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 2, 10, "N/A", text_color=color_white, bgcolor=color_gray)
+        // table.cell(statsTable, 2, 10, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Only show CAGR if enabled
     if showCAGR
         table.cell(statsTable, 0, 11, "📈 CAGR", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 11, str.tostring(cagr * 100, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 2, 11, "N/A", text_color=color_white, bgcolor=color_gray)
+        // table.cell(statsTable, 2, 11, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Only show Calmar Ratio if enabled
     if showCalmarRatio
         table.cell(statsTable, 0, 12, "📊 Calmar Ratio", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 12, str.tostring(calmarRatio, "#.##"), text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 2, 12, "N/A", text_color=color_white, bgcolor=color_gray)
+        // table.cell(statsTable, 2, 12, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Only show Avg Cost Basis if enabled
     if showAvgCostBasis
         table.cell(statsTable, 0, 13, "📈 Avg Cost Basis", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 13, str.tostring(avgCostBasis, format.mintick), text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 2, 13, str.tostring(initialPrice, format.mintick), text_color=color_white, bgcolor=color_gray)
+        // table.cell(statsTable, 2, 13, str.tostring(initialPrice, format.mintick), text_color=color_white, bgcolor=color_gray)
