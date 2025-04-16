@@ -1,0 +1,254 @@
+//@version=6
+strategy("Enhanced DCA Strategy", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100, calc_on_every_tick=true, process_orders_on_close=true)
+
+// === User Settings ===
+investmentAmount = input.float(100, "Investment Amount ($)", minval=1)
+dcaInterval = input.string("Monthly", "Investment Frequency", options=["Daily", "Weekly", "Monthly"])
+startDate = input.time(timestamp("2020-04-01 00:00 +0000"), "Start Date")
+endDate = input.time(timestamp("2025-04-01 00:00 +0000"), "End Date")
+tradingFeePercent = input.float(0.1, "Trading Fee (%)", minval=0, tooltip="Enter the trading fee as a percentage, e.g. 0.1 for Binance Maker Fee")
+
+
+// === Investment Logic ===
+var float totalInvested = 0
+var float totalUnits = 0
+var float maxEquity = 0
+var float maxDrawdown = 0
+var float drawdownStartPrice = na
+var float[] dailyReturns = array.new_float()
+var float initialPrice = na
+var float buyAndHoldUnits = 0
+var float totalInvestmentAmount = 0
+var float totalFeesPaid = 0
+
+// Calculate total investment periods and amount
+var int totalPeriods = 0
+if time >= startDate and time <= endDate
+    // For daily, each period is 1 day (86400000 milliseconds)
+    if dcaInterval == "Daily"
+        totalPeriods := math.floor((endDate - startDate) / (24 * 60 * 60 * 1000))
+    // For weekly, each period is 7 days (604800000 milliseconds)
+    else if dcaInterval == "Weekly"
+        totalPeriods := math.floor((endDate - startDate) / (7 * 24 * 60 * 60 * 1000))
+    // For monthly, each period is 30 days (2592000000 milliseconds)
+    else if dcaInterval == "Monthly"
+        totalPeriods := math.floor((endDate - startDate) / (30 * 24 * 60 * 60 * 1000))
+
+totalInvestmentAmount := investmentAmount * totalPeriods
+
+isInvestmentTime = switch dcaInterval
+    "Daily" => dayofmonth != dayofmonth[1]
+    "Weekly" => dayofweek == dayofweek.monday and dayofweek != dayofweek[1]
+    "Monthly" => month != month[1]
+    => false
+
+canInvest = time >= startDate and time <= endDate and isInvestmentTime
+
+// Initialize Buy and Hold at the first bar after start date
+if time >= startDate and time <= endDate and na(initialPrice) and close > 0
+    initialPrice := close
+    buyAndHoldUnits := totalInvestmentAmount / initialPrice
+
+if canInvest and close > 0
+    fee = investmentAmount * tradingFeePercent / 100
+    netInvestment = investmentAmount - fee
+    units = netInvestment / close
+    totalFeesPaid += fee
+    totalInvested += investmentAmount
+    totalUnits += units
+    strategy.entry("DCA Buy", strategy.long, qty=units)
+    label.new(bar_index, low, "▲", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.tiny)
+
+// === Calculations ===
+currentValue = totalUnits * close
+profit = currentValue - totalInvested
+roi = totalInvested > 0 ? (profit / totalInvested) * 100 : na
+
+// Buy and Hold calculations
+buyAndHoldValue = buyAndHoldUnits * close
+buyAndHoldProfit = buyAndHoldValue - totalInvestmentAmount
+buyAndHoldROI = totalInvestmentAmount > 0 ? (buyAndHoldProfit / totalInvestmentAmount) * 100 : na
+
+// Calculate drawdown
+drawdown = maxEquity > 0 ? (currentValue - maxEquity) / maxEquity * 100 : 0
+if currentValue > maxEquity
+    maxEquity := currentValue
+else if drawdown < maxDrawdown
+    maxDrawdown := drawdown
+    drawdownStartPrice := close
+    label.new(bar_index, high, "Drawdown ⚑", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.tiny)
+
+// Calculate average cost basis
+avgCostBasis = totalUnits > 0 ? totalInvested / totalUnits : na
+plot(avgCostBasis, "Average Cost Basis", color=color.purple, style=plot.style_circles, linewidth=2)
+
+// === Performance Metrics ===
+var float[] monthlyReturns = array.new_float()
+var float previousMonthClose = na
+
+// Detect start of a new month
+isNewMonth = month != month[1]
+
+// Store previous month's close
+if isNewMonth
+    if not na(previousMonthClose) and not na(close)
+        monthlyReturn = (close - previousMonthClose) / previousMonthClose
+        array.push(monthlyReturns, monthlyReturn)
+    previousMonthClose := close
+
+// Monthly risk-free rate (~2% annual e.g. Gov Bonds)
+monthlyRiskFreeRate = 0.02 / 12
+
+// The Sharpe Ratio is a measure of risk-adjusted return. It quantifies how much return an
+// investment provides relative to the risk it takes on.  
+// When using Dollar Cost Averaging (DCA), the Sharpe Ratio can help evaluate the effectiveness of this investment strategy. Here's how:
+// Compares DCA Performance: The Sharpe Ratio allows you to compare the risk-adjusted returns of a DCA strategy to other
+//  investment approaches, such as investing a lump sum.
+// Assesses Risk Reduction: DCA aims to reduce risk by averaging out the purchase price of an asset over time. 
+//  The Sharpe Ratio can help quantify whether DCA effectively improves the risk-adjusted return profile.
+// Optimizes DCA Strategy: You can use the Sharpe Ratio to analyze different DCA strategies, such as varying the
+//  frequency of investments (e.g., weekly vs. monthly), to see which approach provides the best risk-adjusted return.
+
+// What is a Good Sharpe Ratio for a Monthly DCA?
+// The interpretation of a "good" Sharpe Ratio can vary depending on the specific investment and market conditions. 
+// However, here are some general guidelines:
+// Below 1: It indicates that the investment's return is not sufficiently compensating for the risk. The lower the Sharpe Ratio, the less attractive the risk-adjusted return
+// 1 or Higher: A Sharpe Ratio of 1 or greater is generally considered acceptable. It suggests that the investment's return is adequately compensating for the risk taken.
+// 2 or Higher: A Sharpe Ratio of 2 or higher is considered good.
+// 3 or Higher: A Sharpe Ratio of 3 or higher is considered excellent.
+// It's important to compare the Sharpe Ratio of your DCA strategy to that of relevant benchmarks, such as a broad market index or a portfolio with similar assets. Keep in mind that a good Sharpe Ratio does not guarantee future performance, and it's essential to consider other factors before making investment decisions.
+
+var float sharpeRatio = na
+var float sortinoRatio = na
+if array.size(monthlyReturns) > 1
+    avgMonthlyReturn = array.avg(monthlyReturns)
+    var float[] downsideReturns = array.new_float()
+    array.clear(downsideReturns)
+    for i = 0 to array.size(monthlyReturns) - 1
+        val = array.get(monthlyReturns, i)
+        if val < monthlyRiskFreeRate
+            array.push(downsideReturns, val)
+    downsideDev = array.stdev(downsideReturns)
+    sharpeRatio := ((avgMonthlyReturn - monthlyRiskFreeRate) / array.stdev(monthlyReturns)) * math.sqrt(12)
+    
+    // Like the Sharpe Ratio, Sortino focuses only on downside volatility (i.e., harmful volatility). A higher Sortino Ratio is generally preferred
+    // Gives a clearer picture of risk-adjusted returns by ignoring "good" volatility (upside).
+    // By focusing on downside deviation, the Sortino Ratio provides a more refined measure of risk, particularly for investments with asymmetrical return distributions.
+    // A Sortino Ratio below 1.0 is generally considered poor. This indicates that the investment's return is not adequately compensating for its downside risk. In other words, you're taking on more downside risk for the return you're generating.
+    // 1.5 or Higher: A Sortino Ratio of 1.5 or higher is generally considered acceptable.
+    // 2 or Higher: A Sortino Ratio of 2 or higher is considered good.
+    // 2.5 or Higher: A Sortino Ratio of 2.5 or higher is considered excellent.
+    sortinoRatio := downsideDev != 0 ? ((avgMonthlyReturn - monthlyRiskFreeRate) / downsideDev) * math.sqrt(12) : na
+
+// CAGR calculation
+// The average yearly growth rate of your investment if it had grown at a steady rate.
+// Tells you how fast your investment is really growing over time.
+// Great for comparing strategies over different time spans or against something like an index fund.
+// Here are some general benchmarks:
+// 1. Stocks: Historically, the average annual return of the U.S. stock market has been around 10%. Therefore, a CAGR significantly higher than 10% would be considered very good for a stock investment.
+// 2. Real Estate: Long-term, the average annual return for real estate has been in the single digits, typically below stock market returns. A "good" CAGR would need to be compared against specific market conditions and property types.
+// 3. For a Monthly DCA: A good CAGR for a monthly DCA strategy will depend on the asset class you are investing in. For example, if you are using DCA to invest in the stock market, you might aim for a CAGR in the range of 7-10% or higher. If you are investing in a more volatile asset class, such as Bitcoin, you might expect a higher CAGR, but with greater risk.
+
+numYears = (endDate - startDate) / (365 * 24 * 60 * 60 * 1000)
+cagr = (totalInvested > 0 and numYears > 0) ? math.pow(currentValue / totalInvested, 1 / numYears) - 1 : na
+
+// Calmar Ratio
+// It compares the annualised return of an investment to its maximum drawdown
+// A higher Calmar Ratio indicates better risk-adjusted performance, with a focus on downside risk. It shows how much return an investment has generated for the amount of its largest loss.
+// 1 or Higher: A Calmar Ratio of 1 or greater is generally considered acceptable. It suggests that the investment's annualised return is equal to or greater than its maximum drawdown.
+// 2 or Higher: A Calmar Ratio of 2 or higher is considered good.
+// 3 or Higher: A Calmar Ratio of 3 or higher is considered excellent.
+calmarRatio = maxDrawdown != 0 ? cagr / math.abs(maxDrawdown / 100) : na
+
+// Predefined colors
+color_white = color.new(color.white, 0)
+color_navy = color.new(color.navy, 0)
+color_gray = color.new(color.gray, 0)
+color_dark_gray = color.new(color.gray, 90) // A darker shade of gray for comments
+
+// === Optional Settings for Displaying Ratios ===
+showSharpeRatio = input.bool(true, title="Show Sharpe Ratio")
+showSortinoRatio = input.bool(true, title="Show Sortino Ratio")
+showCAGR = input.bool(true, title="Show CAGR")
+showCalmarRatio = input.bool(true, title="Show Calmar Ratio")
+showAvgCostBasis = input.bool(true, title="Show Avg Cost Basis")
+
+// === TABLE ===
+var table statsTable = table.new(position.top_right, 3, 15, border_width=1)
+
+if bar_index % 10 == 0 or na(bar_index)
+    // Table Headers
+    table.cell(statsTable, 0, 0, "📊 Strategy", text_color=color_white, bgcolor=color_navy, text_halign=text.align_center)
+    table.cell(statsTable, 1, 0, "DCA", text_color=color_white, bgcolor=color_navy, text_halign=text.align_center)
+    table.cell(statsTable, 2, 0, "Buy & Hold", text_color=color_white, bgcolor=color_navy, text_halign=text.align_center)
+
+    // Total Invested
+    table.cell(statsTable, 0, 1, "💵 Total Invested", text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 1, 1, str.tostring(totalInvested, format.mintick), text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 2, 1, str.tostring(totalInvestmentAmount, format.mintick), text_color=color_white, bgcolor=color_gray)
+
+    // Total Fees Paid
+    table.cell(statsTable, 0, 2, "💸 Fees Paid", text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 1, 2, str.tostring(totalFeesPaid, format.mintick), text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 2, 2, "N/A", text_color=color_white, bgcolor=color_gray)
+
+    // Net Cost for Units
+    table.cell(statsTable, 0, 3, "💲 Net Cost / Units", text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 1, 3, str.tostring(totalInvested - totalFeesPaid, format.mintick), text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 2, 3, "N/A", text_color=color_white, bgcolor=color_gray)
+
+    // Total Units
+    table.cell(statsTable, 0, 4, "🪙 Total Units", text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 1, 4, str.tostring(totalUnits, format.mintick), text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 2, 4, str.tostring(buyAndHoldUnits, format.mintick), text_color=color_white, bgcolor=color_gray)
+
+    // Current Value
+    table.cell(statsTable, 0, 5, "📈 Current Value", text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 1, 5, str.tostring(currentValue, format.mintick), text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 2, 5, str.tostring(buyAndHoldValue, format.mintick), text_color=color_white, bgcolor=color_gray)
+
+    // Profit
+    table.cell(statsTable, 0, 6, "💰 Profit", text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 1, 6, str.tostring(profit, format.mintick), text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 2, 6, str.tostring(buyAndHoldProfit, format.mintick), text_color=color_white, bgcolor=color_gray)
+
+    // ROI
+    table.cell(statsTable, 0, 7, "📊 ROI", text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 1, 7, str.tostring(roi, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 2, 7, str.tostring(buyAndHoldROI, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
+
+    // Max Drawdown
+    table.cell(statsTable, 0, 8, "📉 Max Drawdown", text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 1, 8, str.tostring(maxDrawdown, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
+    table.cell(statsTable, 2, 8, "N/A", text_color=color_white, bgcolor=color_gray)
+
+    // Only show Sharpe Ratio if enabled
+    if showSharpeRatio
+        table.cell(statsTable, 0, 9, "📊 Sharpe Ratio", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 9, str.tostring(sharpeRatio, "#.##"), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 2, 9, "N/A", text_color=color_white, bgcolor=color_gray)
+
+    // Only show Sortino Ratio if enabled
+    if showSortinoRatio
+        table.cell(statsTable, 0, 10, "📊 Sortino Ratio", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 10, str.tostring(sortinoRatio, "#.##"), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 2, 10, "N/A", text_color=color_white, bgcolor=color_gray)
+
+    // Only show CAGR if enabled
+    if showCAGR
+        table.cell(statsTable, 0, 11, "📈 CAGR", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 11, str.tostring(cagr * 100, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 2, 11, "N/A", text_color=color_white, bgcolor=color_gray)
+
+    // Only show Calmar Ratio if enabled
+    if showCalmarRatio
+        table.cell(statsTable, 0, 12, "📊 Calmar Ratio", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 12, str.tostring(calmarRatio, "#.##"), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 2, 12, "N/A", text_color=color_white, bgcolor=color_gray)
+
+    // Only show Avg Cost Basis if enabled
+    if showAvgCostBasis
+        table.cell(statsTable, 0, 13, "📈 Avg Cost Basis", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 13, str.tostring(avgCostBasis, format.mintick), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 2, 13, str.tostring(initialPrice, format.mintick), text_color=color_white, bgcolor=color_gray)
+
