@@ -5,7 +5,7 @@ strategy("Enhanced DCA Strategy", overlay=true, default_qty_type=strategy.percen
 investmentAmount = input.float(100, "Investment Amount ($)", minval=1)
 dcaInterval = input.string("Monthly", "Investment Frequency", options=["Daily", "Weekly", "Monthly"])
 startDate = input.time(timestamp("2020-04-01 00:00 +0000"), "Start Date")
-endDate = input.time(timestamp("2025-04-01 00:00 +0000"), "End Date")
+endDate = input.time(timestamp("2999-04-01 00:00 +0000"), "End Date")
 tradingFeePercent = input.float(0.1, "Trading Fee (%)", minval=0, tooltip="Enter the trading fee as a percentage, e.g. 0.1 for Binance Maker Fee")
 // includeFeesInBuyAndHold = input.bool(true, "Include Fees in Buy & Hold Calculation", tooltip="Apply the same trading fee to the Buy & Hold strategy to better compare against DCA.")
 
@@ -23,6 +23,9 @@ var float initialPrice = na
 //var float buyAndHoldFees = 0
 var float totalInvestmentAmount = 0
 var float totalFeesPaid = 0
+var float grossProfits = 0
+var float grossLosses = 0
+var float profitFactor = na
 
 // Calculate total investment periods and amount
 var int totalPeriods = 0
@@ -48,8 +51,8 @@ isInvestmentTime = switch dcaInterval
 canInvest = time >= startDate and time <= endDate and isInvestmentTime
 
 // Initialize Buy and Hold at the first bar after start date
-if time >= startDate and time <= endDate and na(initialPrice) and close > 0
-    initialPrice := close
+// if time >= startDate and time <= endDate and na(initialPrice) and close > 0
+    // initialPrice := close
     // buyAndHoldFees := includeFeesInBuyAndHold ? totalInvestmentAmount * tradingFeePercent / 100 : 0
     // buyAndHoldUnits := (totalInvestmentAmount - buyAndHoldFees) / initialPrice
 
@@ -165,6 +168,17 @@ cagr = (totalInvested > 0 and numYears > 0) ? math.pow(currentValue / totalInves
 // 3 or Higher: A Calmar Ratio of 3 or higher is considered excellent.
 calmarRatio = maxDrawdown != 0 ? cagr / math.abs(maxDrawdown / 100) : na
 
+// === Gross Profit/Loss Calculation for Profit Factor ===
+if strategy.opentrades > 0
+    for i = 0 to strategy.opentrades - 1
+        if strategy.opentrades.entry_price(i) < close
+            grossProfits += strategy.opentrades.profit(i)
+        else
+            grossLosses += math.abs(strategy.opentrades.profit(i))
+
+if grossLosses != 0
+    profitFactor := grossProfits / grossLosses
+
 // Predefined colors
 color_white = color.new(color.white, 0)
 color_navy = color.new(color.navy, 0)
@@ -177,7 +191,7 @@ showSortinoRatio = input.bool(true, title="Show Sortino Ratio", tooltip="The Sor
 showCAGR = input.bool(true, title="Show CAGR", tooltip="The Compound Annual Growth Rate (CAGR) is the rate at which an investment would have grown if it had grown at a steady rate, compounded annually.")
 showCalmarRatio = input.bool(true, title="Show Calmar Ratio", tooltip="The Calmar ratio is the ratio of the average annual return to the maximum drawdown, helping to evaluate risk-adjusted return in volatile markets.")
 showAvgCostBasis = input.bool(true, title="Show Avg Cost Basis", tooltip="The Average Cost Basis represents the average price at which the asset has been purchased, including any transaction fees.")
-
+showProfitFactor = input.bool(true, title = "Show Profit Factor", tooltip = "The amount of money a trading strategy made for every unit of money it lost (in the selected currency). This value is calculated by dividing gross profits by gross losses.") 
 // === Optional Settings for Displaying Metrics ===
 showTotalInvested = input.bool(true, title="Show Total Invested", tooltip="The Total Invested represents the total amount of money invested in the strategy, including all purchases made over time.")
 showFeesPaid = input.bool(true, title="Show Fees Paid", tooltip="The Fees Paid show the total fees incurred from purchasing assets, such as exchange fees or transaction costs.")
@@ -189,7 +203,7 @@ showROI = input.bool(true, title="Show ROI", tooltip="The Return on Investment (
 showMaxDrawdown = input.bool(true, title="Show Max Drawdown", tooltip="The Max Drawdown measures the largest peak-to-trough decline in value during the strategy's operation, showing the maximum risk taken in the worst period.")
 
 // === TABLE ===
-var table statsTable = table.new(position.top_right, 3, 15, border_width=2)
+var table statsTable = table.new(position.top_right, 3, 16, border_width=2)
 
 if bar_index % 10 == 0 or na(bar_index)
     // Table Headers
@@ -233,44 +247,48 @@ if bar_index % 10 == 0 or na(bar_index)
         table.cell(statsTable, 1, 6, str.tostring(profit, format.mintick), text_color=color_white, bgcolor=color_gray)
         // table.cell(statsTable, 2, 6, str.tostring(buyAndHoldProfit, format.mintick), text_color=color_white, bgcolor=color_gray)
 
+    // Profit Factor
+    if showProfitFactor
+        table.cell(statsTable, 0, 7, "💡 Profit Factor", text_color=color.white, bgcolor=color.gray)
+        table.cell(statsTable, 1, 7, str.tostring(profitFactor, "#.##"), text_color=color.white, bgcolor=color.gray)
     // ROI
     if showROI
-        table.cell(statsTable, 0, 7, "📊 ROI", text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 1, 7, str.tostring(roi, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 0, 8, "📊 ROI", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 8, str.tostring(roi, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
         // table.cell(statsTable, 2, 7, str.tostring(buyAndHoldROI, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
 
     // Max Drawdown
     if showMaxDrawdown
-        table.cell(statsTable, 0, 8, "📉 Max Drawdown", text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 1, 8, str.tostring(maxDrawdown, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 0, 9, "📉 Max Drawdown", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 9, str.tostring(maxDrawdown, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
         // table.cell(statsTable, 2, 8, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Only show Sharpe Ratio if enabled
     if showSharpeRatio
-        table.cell(statsTable, 0, 9, "📊 Sharpe Ratio", text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 1, 9, str.tostring(sharpeRatio, "#.##"), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 0, 10, "📊 Sharpe Ratio", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 10, str.tostring(sharpeRatio, "#.##"), text_color=color_white, bgcolor=color_gray)
         // table.cell(statsTable, 2, 9, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Only show Sortino Ratio if enabled
     if showSortinoRatio
-        table.cell(statsTable, 0, 10, "📊 Sortino Ratio", text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 1, 10, str.tostring(sortinoRatio, "#.##"), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 0, 11, "📊 Sortino Ratio", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 11, str.tostring(sortinoRatio, "#.##"), text_color=color_white, bgcolor=color_gray)
         // table.cell(statsTable, 2, 10, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Only show CAGR if enabled
     if showCAGR
-        table.cell(statsTable, 0, 11, "📈 CAGR", text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 1, 11, str.tostring(cagr * 100, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 0, 12, "📈 CAGR", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 12, str.tostring(cagr * 100, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
         // table.cell(statsTable, 2, 11, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Only show Calmar Ratio if enabled
     if showCalmarRatio
-        table.cell(statsTable, 0, 12, "📊 Calmar Ratio", text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 1, 12, str.tostring(calmarRatio, "#.##"), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 0, 13, "📊 Calmar Ratio", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 13, str.tostring(calmarRatio, "#.##"), text_color=color_white, bgcolor=color_gray)
         // table.cell(statsTable, 2, 12, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Only show Avg Cost Basis if enabled
     if showAvgCostBasis
-        table.cell(statsTable, 0, 13, "📈 Avg Cost Basis", text_color=color_white, bgcolor=color_gray)
-        table.cell(statsTable, 1, 13, str.tostring(avgCostBasis, format.mintick), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 0, 14, "📈 Avg Cost Basis", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 14, str.tostring(avgCostBasis, format.mintick), text_color=color_white, bgcolor=color_gray)
         // table.cell(statsTable, 2, 13, str.tostring(initialPrice, format.mintick), text_color=color_white, bgcolor=color_gray)
