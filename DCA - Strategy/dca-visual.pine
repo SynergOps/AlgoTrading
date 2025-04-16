@@ -167,11 +167,21 @@ color_gray = color.new(color.gray, 0)
 color_dark_gray = color.new(color.gray, 90) // A darker shade of gray for comments
 
 // === Optional Settings for Displaying Ratios ===
-showSharpeRatio = input.bool(true, title="Show Sharpe Ratio")
-showSortinoRatio = input.bool(true, title="Show Sortino Ratio")
-showCAGR = input.bool(true, title="Show CAGR")
-showCalmarRatio = input.bool(true, title="Show Calmar Ratio")
-showAvgCostBasis = input.bool(true, title="Show Avg Cost Basis")
+showSharpeRatio = input.bool(true, title="Show Sharpe Ratio", tooltip="The Sharpe ratio measures the risk-adjusted return of the strategy. A higher ratio indicates better risk-adjusted performance.")
+showSortinoRatio = input.bool(true, title="Show Sortino Ratio", tooltip="The Sortino ratio is a variation of the Sharpe ratio that only considers downside risk, making it more appropriate for strategies with negative skewness.")
+showCAGR = input.bool(true, title="Show CAGR", tooltip="The Compound Annual Growth Rate (CAGR) is the rate at which an investment would have grown if it had grown at a steady rate, compounded annually.")
+showCalmarRatio = input.bool(true, title="Show Calmar Ratio", tooltip="The Calmar ratio is the ratio of the average annual return to the maximum drawdown, helping to evaluate risk-adjusted return in volatile markets.")
+showAvgCostBasis = input.bool(true, title="Show Avg Cost Basis", tooltip="The Average Cost Basis represents the average price at which the asset has been purchased, including any transaction fees.")
+
+// === Optional Settings for Displaying Metrics ===
+showTotalInvested = input.bool(true, title="Show Total Invested", tooltip="The Total Invested represents the total amount of money invested in the strategy, including all purchases made over time.")
+showFeesPaid = input.bool(true, title="Show Fees Paid", tooltip="The Fees Paid show the total fees incurred from purchasing assets, such as exchange fees or transaction costs.")
+showNetCostPerUnit = input.bool(true, title="Show Net Cost / Units", tooltip="The Net Cost per Unit represents the price per unit of the asset after accounting for fees and investments.")
+showTotalUnits = input.bool(true, title="Show Total Units", tooltip="The Total Units shows the total number of units or shares of the asset acquired by the strategy.")
+showCurrentValue = input.bool(true, title="Show Current Value", tooltip="The Current Value displays the current value of the total units owned, based on the latest price of the asset.")
+showProfit = input.bool(true, title="Show Profit", tooltip="The Profit shows the difference between the total current value and the total invested, representing the strategy's overall gain or loss.")
+showROI = input.bool(true, title="Show ROI", tooltip="The Return on Investment (ROI) is the percentage return on the total amount invested, indicating how much profit or loss has been made relative to the initial investment.")
+showMaxDrawdown = input.bool(true, title="Show Max Drawdown", tooltip="The Max Drawdown measures the largest peak-to-trough decline in value during the strategy's operation, showing the maximum risk taken in the worst period.")
 
 // === TABLE ===
 var table statsTable = table.new(position.top_right, 3, 15, border_width=1)
@@ -183,44 +193,52 @@ if bar_index % 10 == 0 or na(bar_index)
     table.cell(statsTable, 2, 0, "Buy & Hold", text_color=color_white, bgcolor=color_navy, text_halign=text.align_center)
 
     // Total Invested
-    table.cell(statsTable, 0, 1, "💵 Total Invested", text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 1, 1, str.tostring(totalInvested, format.mintick), text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 2, 1, str.tostring(totalInvestmentAmount, format.mintick), text_color=color_white, bgcolor=color_gray)
+    if showTotalInvested
+        table.cell(statsTable, 0, 1, "💵 Total Invested", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 1, str.tostring(totalInvested, format.mintick), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 2, 1, str.tostring(totalInvestmentAmount, format.mintick), text_color=color_white, bgcolor=color_gray)
 
-    // Total Fees Paid
-    table.cell(statsTable, 0, 2, "💸 Fees Paid", text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 1, 2, str.tostring(totalFeesPaid, format.mintick), text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 2, 2, "N/A", text_color=color_white, bgcolor=color_gray)
+    // Fees Paid
+    if showFeesPaid
+        table.cell(statsTable, 0, 2, "💸 Fees Paid", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 2, str.tostring(totalFeesPaid, format.mintick), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 2, 2, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Net Cost for Units
-    table.cell(statsTable, 0, 3, "💲 Net Cost / Units", text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 1, 3, str.tostring(totalInvested - totalFeesPaid, format.mintick), text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 2, 3, "N/A", text_color=color_white, bgcolor=color_gray)
+    if showNetCostPerUnit
+        table.cell(statsTable, 0, 3, "💲 Net Cost / Units", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 3, str.tostring(totalInvested - totalFeesPaid, format.mintick), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 2, 3, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Total Units
-    table.cell(statsTable, 0, 4, "🪙 Total Units", text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 1, 4, str.tostring(totalUnits, format.mintick), text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 2, 4, str.tostring(buyAndHoldUnits, format.mintick), text_color=color_white, bgcolor=color_gray)
+    if showTotalUnits
+        table.cell(statsTable, 0, 4, "🪙 Total Units", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 4, str.tostring(totalUnits, format.mintick), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 2, 4, str.tostring(buyAndHoldUnits, format.mintick), text_color=color_white, bgcolor=color_gray)
 
     // Current Value
-    table.cell(statsTable, 0, 5, "📈 Current Value", text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 1, 5, str.tostring(currentValue, format.mintick), text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 2, 5, str.tostring(buyAndHoldValue, format.mintick), text_color=color_white, bgcolor=color_gray)
+    if showCurrentValue
+        table.cell(statsTable, 0, 5, "📈 Current Value", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 5, str.tostring(currentValue, format.mintick), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 2, 5, str.tostring(buyAndHoldValue, format.mintick), text_color=color_white, bgcolor=color_gray)
 
     // Profit
-    table.cell(statsTable, 0, 6, "💰 Profit", text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 1, 6, str.tostring(profit, format.mintick), text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 2, 6, str.tostring(buyAndHoldProfit, format.mintick), text_color=color_white, bgcolor=color_gray)
+    if showProfit
+        table.cell(statsTable, 0, 6, "💰 Profit", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 6, str.tostring(profit, format.mintick), text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 2, 6, str.tostring(buyAndHoldProfit, format.mintick), text_color=color_white, bgcolor=color_gray)
 
     // ROI
-    table.cell(statsTable, 0, 7, "📊 ROI", text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 1, 7, str.tostring(roi, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 2, 7, str.tostring(buyAndHoldROI, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
+    if showROI
+        table.cell(statsTable, 0, 7, "📊 ROI", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 7, str.tostring(roi, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 2, 7, str.tostring(buyAndHoldROI, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
 
     // Max Drawdown
-    table.cell(statsTable, 0, 8, "📉 Max Drawdown", text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 1, 8, str.tostring(maxDrawdown, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
-    table.cell(statsTable, 2, 8, "N/A", text_color=color_white, bgcolor=color_gray)
+    if showMaxDrawdown
+        table.cell(statsTable, 0, 8, "📉 Max Drawdown", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 1, 8, str.tostring(maxDrawdown, "#.##") + "%", text_color=color_white, bgcolor=color_gray)
+        table.cell(statsTable, 2, 8, "N/A", text_color=color_white, bgcolor=color_gray)
 
     // Only show Sharpe Ratio if enabled
     if showSharpeRatio
@@ -251,4 +269,3 @@ if bar_index % 10 == 0 or na(bar_index)
         table.cell(statsTable, 0, 13, "📈 Avg Cost Basis", text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 1, 13, str.tostring(avgCostBasis, format.mintick), text_color=color_white, bgcolor=color_gray)
         table.cell(statsTable, 2, 13, str.tostring(initialPrice, format.mintick), text_color=color_white, bgcolor=color_gray)
-
