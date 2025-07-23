@@ -81,5 +81,5 @@ Measuring the same set of historical values using Lorentzian Distance yields a d
 
 ---
 - Original Author: https://www.tradingview.com/u/jdehorty/
-- License: MIT License
+- License: Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 - Youtube Video: https://www.youtube.com/watch?v=AdINVvnJfX4
