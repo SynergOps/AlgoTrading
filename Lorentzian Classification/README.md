@@ -80,6 +80,35 @@ Measuring the same set of historical values using Lorentzian Distance yields a d
 3. Lorentzian Distance becomes increasingly different from Euclidean Distance as the number of nearest neighbors used for comparison increases.
 
 ---
+
+## Backtesting
+
+This repository includes a backtesting adapter (`backtesting stream.pine`) that allows you to test the Lorentzian Classification strategy with historical data.
+
+### Setup Instructions
+
+1. **Load the Main Indicator**: First, add the main Lorentzian Classification indicator (`ML-lorentzian-classification.pine`) to your chart.
+
+2. **Configure Source Selection**: In the backtesting adapter, select the source from the dropdown menu and choose **"Lorentzian Clas. Backtest Stream"** to connect it with the main indicator signals.
+
+3. **Adjust Backtest Start Date**: When setting the backtest start date, ensure you account for the **Max bars to lookback** parameter of the main Lorentzian Classification indicator. The backtest start date should be set sufficiently far from the beginning of your data to allow the indicator to gather enough historical data points for accurate classification.
+
+   **Important**: If your main indicator uses a lookback period of 500 bars, ensure your backtest start date is at least 500+ bars after the beginning of your dataset to avoid inaccurate results during the initial period.
+
+4. **Signal Mapping**: The backtesting adapter interprets the following signal values:
+   - `1`: Start Long Trade
+   - `2`: End Long Trade  
+   - `-1`: Start Short Trade
+   - `-2`: End Short Trade
+
+### Backtest Parameters
+- Initial Capital: $1,000
+- Position Size: 10% of equity per trade
+- Commission: 0.05%
+- No pyramiding allowed
+- Margin requirements: 10x leverage for both long and short positions
+
+---
 - Original Author: https://www.tradingview.com/u/jdehorty/
 - License: Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 - Youtube Video: https://www.youtube.com/watch?v=AdINVvnJfX4
