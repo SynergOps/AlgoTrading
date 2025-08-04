@@ -2,7 +2,7 @@
 // © SynergOps
 
 //@version=6
-indicator("DeMark Pivot Points", "DeMark Pivots", overlay=true, max_lines_count=500, max_labels_count=500)
+strategy("DeMark Pivot Points Strategy", "DeMark Strategy", overlay=true, max_lines_count=500, max_labels_count=500, default_qty_type=strategy.percent_of_equity, default_qty_value=10, commission_type=strategy.commission.percent, commission_value=0.1)
 
 pivotTypeInput           = "DM"  // Fixed to DeMark pivots only
 pivotAnchorInput         = "Daily"  // Fixed to Daily timeframe only
@@ -16,6 +16,10 @@ linewidthInput           = input.int(title="Line Width", defval=2, minval=1, max
 // Signal settings
 showSignalsInput         = input.bool(title="Show PP Cross Signals", defval=true, group="signals", display = display.data_window)
 signalSizeInput          = input.string(title="Signal Size", defval="small", options=["tiny", "small", "normal", "large", "huge"], group="signals", display = display.data_window)
+
+// Strategy settings
+enableStrategyInput      = input.bool(title="Enable Strategy Trading", defval=true, group="strategy", display = display.data_window)
+riskPercentInput         = input.float(title="Risk per Trade (%)", defval=2.0, minval=0.1, maxval=10.0, step=0.1, group="strategy", display = display.data_window)
 
 // Debug settings
 showDebugInput           = input.bool(title="Show Debug Indicators", defval=false, group="debug", display = display.data_window, tooltip="Shows small triangles for all PP crosses, bias indicators, and debug plots for troubleshooting")
@@ -52,6 +56,8 @@ numOfPivotLevels = 3
 // Variables to track pivot point values for signal detection
 var float currentPP = na
 var float previousPP = na
+var float currentS1 = na
+var float currentR1 = na
 var isBullishBias = false
 var int pivotPeriodCounter = 0
 
@@ -136,6 +142,9 @@ securityPivotDrawConditionStatic = isDailyBasedInput and securityPivotCounter !=
 // Track pivot point values for signal detection
 if not na(pivotPointsArray) and array.size(pivotPointsArray) > 0
     newPP = array.get(pivotPointsArray, 0)[1]  // Get PP value (index 0, coordinate)
+    newS1 = array.size(pivotPointsArray) > 2 ? array.get(pivotPointsArray, 2)[1] : na  // Get S1 value (index 2)
+    newR1 = array.size(pivotPointsArray) > 1 ? array.get(pivotPointsArray, 1)[1] : na  // Get R1 value (index 1)
+    
     if not na(newPP)
         // For daily pivots on intraday timeframes, use daily timeframe change
         dailyChange = timeframe.change("1D")
@@ -147,6 +156,8 @@ if not na(pivotPointsArray) and array.size(pivotPointsArray) > 0
                 previousPP := currentPP
                 pivotPeriodCounter := pivotPeriodCounter + 1
             currentPP := newPP
+            currentS1 := newS1
+            currentR1 := newR1
             
         // Calculate bias on every bar once we have both current and previous PP
         if not na(previousPP) and not na(currentPP)
@@ -202,6 +213,41 @@ if showSignalsInput and not na(currentPP) and not na(previousPP)
                  style=label.style_none, 
                  size=signalSize,
                  tooltip="Bearish PP Cross")
+
+// Strategy Logic
+if enableStrategyInput and not na(currentPP) and not na(previousPP) and not na(currentS1) and not na(currentR1)
+    
+    // Check if price touches PP line (high >= PP >= low)
+    priceTouchesP = high >= currentPP and low <= currentPP
+    
+    // Entry conditions based on bias and price touching P line
+    longCondition = isBullishBias and priceTouchesP and strategy.position_size == 0
+    shortCondition = not isBullishBias and priceTouchesP and strategy.position_size == 0
+    
+    // Calculate position size based on risk percentage
+    riskAmount = strategy.equity * (riskPercentInput / 100)
+    
+    if longCondition
+        // Long entry: Entry at P, Stop at S1, Target at R1
+        stopDistance = currentPP - currentS1
+        if stopDistance > 0
+            positionSize = riskAmount / stopDistance
+            strategy.entry("Long", strategy.long, qty=positionSize, limit=currentPP)
+            strategy.exit("Long Exit", "Long", stop=currentS1, limit=currentR1)
+            
+            // Show entry signal
+            label.new(bar_index, currentPP, "L", style=label.style_label_down, color=color.green, textcolor=color.white, size=size.small)
+    
+    if shortCondition
+        // Short entry: Entry at P, Stop at R1, Target at S1
+        stopDistance = currentR1 - currentPP
+        if stopDistance > 0
+            positionSize = riskAmount / stopDistance
+            strategy.entry("Short", strategy.short, qty=positionSize, limit=currentPP)
+            strategy.exit("Short Exit", "Short", stop=currentR1, limit=currentS1)
+            
+            // Show entry signal
+            label.new(bar_index, currentPP, "S", style=label.style_label_up, color=color.red, textcolor=color.white, size=size.small)
 
 // If possible, draw pivots from the beginning of the chart if none were found
 var FIRST_BAR_TIME = time
