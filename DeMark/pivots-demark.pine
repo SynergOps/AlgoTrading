@@ -60,6 +60,7 @@ var float currentS1 = na
 var float currentR1 = na
 var isBullishBias = false
 var int pivotPeriodCounter = 0
+var bool tradeExecutedToday = false  // Track if trade was executed for current pivot day
 
 // Get signal size
 signalSize = switch signalSizeInput
@@ -155,6 +156,7 @@ if not na(pivotPointsArray) and array.size(pivotPointsArray) > 0
             if dailyChange or (not na(currentPP) and newPP != currentPP)
                 previousPP := currentPP
                 pivotPeriodCounter := pivotPeriodCounter + 1
+                tradeExecutedToday := false  // Reset trade flag for new pivot day
             currentPP := newPP
             currentS1 := newS1
             currentR1 := newR1
@@ -220,9 +222,9 @@ if enableStrategyInput and not na(currentPP) and not na(previousPP) and not na(c
     // Check if price touches PP line (high >= PP >= low)
     priceTouchesP = high >= currentPP and low <= currentPP
     
-    // Entry conditions based on bias and price touching P line
-    longCondition = isBullishBias and priceTouchesP and strategy.position_size == 0
-    shortCondition = not isBullishBias and priceTouchesP and strategy.position_size == 0
+    // Entry conditions based on bias, price touching P line, and no trade executed today
+    longCondition = isBullishBias and priceTouchesP and strategy.position_size == 0 and not tradeExecutedToday
+    shortCondition = not isBullishBias and priceTouchesP and strategy.position_size == 0 and not tradeExecutedToday
     
     // Calculate position size based on risk percentage
     riskAmount = strategy.equity * (riskPercentInput / 100)
@@ -234,6 +236,7 @@ if enableStrategyInput and not na(currentPP) and not na(previousPP) and not na(c
             positionSize = riskAmount / stopDistance
             strategy.entry("Long", strategy.long, qty=positionSize, limit=currentPP)
             strategy.exit("Long Exit", "Long", stop=currentS1, limit=currentR1)
+            tradeExecutedToday := true  // Mark trade as executed for this pivot day
             
             // Show entry signal
             label.new(bar_index, currentPP, "L", style=label.style_label_down, color=color.green, textcolor=color.white, size=size.small)
@@ -245,6 +248,7 @@ if enableStrategyInput and not na(currentPP) and not na(previousPP) and not na(c
             positionSize = riskAmount / stopDistance
             strategy.entry("Short", strategy.short, qty=positionSize, limit=currentPP)
             strategy.exit("Short Exit", "Short", stop=currentR1, limit=currentS1)
+            tradeExecutedToday := true  // Mark trade as executed for this pivot day
             
             // Show entry signal
             label.new(bar_index, currentPP, "S", style=label.style_label_up, color=color.red, textcolor=color.white, size=size.small)
