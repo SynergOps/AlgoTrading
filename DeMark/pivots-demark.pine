@@ -1,0 +1,216 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © SynergOps
+
+//@version=6
+indicator("DeMark Pivot Points", "DeMark Pivots", overlay=true, max_lines_count=500, max_labels_count=500)
+
+pivotTypeInput           = "DM"  // Fixed to DeMark pivots only
+pivotAnchorInput         = "Daily"  // Fixed to Daily timeframe only
+maxHistoricalPivotsInput = input.int(title="Number of Pivots Back", defval=5, minval=1, maxval=200, display = display.data_window)
+isDailyBasedInput        = input.bool(title="Use Daily-based Values", defval=true, display = display.data_window, tooltip="When this option is unchecked, Pivot Points will use intraday data while calculating on intraday charts. If Extended Hours are displayed on the chart, they will be taken into account during the pivot level calculation. If intraday OHLC values are different from daily-based values (normal for stocks), the pivot levels will also differ.")
+showLabelsInput          = input.bool(title="Show Labels", defval=true, group="labels", display = display.data_window)
+showPricesInput          = input.bool(title="Show Prices", defval=true, group="labels", display = display.data_window)
+positionLabelsInput      = input.string("Right", "Labels Position", options=["Left", "Right"], group="labels", display = display.data_window, active = showLabelsInput or showPricesInput)
+linewidthInput           = input.int(title="Line Width", defval=2, minval=1, maxval=100, group="levels", display = display.data_window)
+
+// Signal settings
+showSignalsInput         = input.bool(title="Show PP Cross Signals", defval=true, group="signals", display = display.data_window)
+signalSizeInput          = input.string(title="Signal Size", defval="small", options=["tiny", "small", "normal", "large", "huge"], group="signals", display = display.data_window)
+
+// Debug settings
+showDebugInput           = input.bool(title="Show Debug Indicators", defval=false, group="debug", display = display.data_window, tooltip="Shows small triangles for all PP crosses, bias indicators, and debug plots for troubleshooting")
+
+DEFAULT_COLOR = #FB8C00
+
+pColorInput = input.color(color.gray, "P‏  ‏  ‏", inline="P", group="levels", display = display.data_window)
+pShowInput = input.bool(true, "", inline="P", group="levels", display = display.data_window)
+s1ColorInput = input.color(color.green, "S1", inline="S1/R1" , group="levels", display = display.data_window)
+s1ShowInput = input.bool(true, "", inline="S1/R1", group="levels", display = display.data_window)
+r1ColorInput = input.color(color.red, "‏  ‏  ‏  ‏  ‏  ‏  ‏  ‏R1", inline="S1/R1", group="levels", display = display.data_window)
+r1ShowInput = input.bool(true, "", inline="S1/R1", group="levels", display = display.data_window)
+
+type graphicSettings
+    string levelName
+    color levelColor
+    bool showLevel
+
+var graphicSettingsArray = array.from(
+      graphicSettings.new(" P", pColorInput, pShowInput),
+      graphicSettings.new("R1", r1ColorInput, r1ShowInput), 
+      graphicSettings.new("S1", s1ColorInput, s1ShowInput),
+      graphicSettings.new("", #00000000, false))  // Placeholder for potential 4th level
+
+// Fixed to Daily timeframe
+pivotTimeframe = "1D"
+
+// Fixed to 1 year multiplier for daily pivots
+pivotYearMultiplier = 1
+
+// DeMark pivots have 3 levels: P, S1, R1
+numOfPivotLevels = 3
+
+// Variables to track pivot point values for signal detection
+var float currentPP = na
+var float previousPP = na
+var isBullishBias = false
+var int pivotPeriodCounter = 0
+
+// Get signal size
+signalSize = switch signalSizeInput
+    "tiny" => size.tiny
+    "small" => size.small
+    "normal" => size.normal
+    "large" => size.large
+    "huge" => size.huge
+    => size.small
+
+type pivotGraphic
+    line pivotLine
+    label pivotLabel
+
+method delete(pivotGraphic graphic) =>
+    graphic.pivotLine.delete()
+    graphic.pivotLabel.delete()
+
+var drawnGraphics = matrix.new<pivotGraphic>()
+
+localPivotTimeframeChange = timeframe.change(pivotTimeframe)
+securityPivotTimeframeChange = timeframe.change(timeframe.period)
+
+pivotTimeframeChangeCounter(condition) => 
+    var count = 0
+    if condition and bar_index > 0
+        count += 1
+    count
+
+localPivots = ta.pivot_point_levels("DM", localPivotTimeframeChange)
+securityPivotPointsArray = ta.pivot_point_levels("DM", securityPivotTimeframeChange)
+
+securityTimeframe = timeframe.isintraday ? "1D" : timeframe.period
+[securityPivots, securityPivotCounter] = request.security(syminfo.tickerid, pivotTimeframe, [securityPivotPointsArray, pivotTimeframeChangeCounter(securityPivotTimeframeChange)], lookahead = barmerge.lookahead_on)
+pivotPointsArray = isDailyBasedInput ? securityPivots : localPivots
+
+//@function Sets the ending points of the currently active pivots to `endTime`.
+affixOldPivots(endTime) =>
+    if drawnGraphics.rows() > 0
+        lastGraphics = drawnGraphics.row(drawnGraphics.rows() - 1)
+
+        for graphic in lastGraphics
+            graphic.pivotLine.set_x2(endTime)
+            if positionLabelsInput == "Right"
+                graphic.pivotLabel.set_x(endTime)
+
+//@function Draws pivot lines and labels from `startTime` to the approximate end of the period.
+drawNewPivots(startTime) =>
+    
+    newGraphics = array.new<pivotGraphic>()
+
+    for [index, coord] in pivotPointsArray
+        if index < array.size(graphicSettingsArray)  // Safety check for array bounds
+            levelSettings = graphicSettingsArray.get(index)
+            if not na(coord) and levelSettings.showLevel
+                lineEndTime = startTime + timeframe.in_seconds(pivotTimeframe) * 1000
+                pivotLine = line.new(startTime, coord, lineEndTime, coord, xloc = xloc.bar_time, color=levelSettings.levelColor, width=linewidthInput)
+                pivotLabel = label.new(x = positionLabelsInput == "Left" ? startTime : lineEndTime,
+                                   y = coord,
+                                   text = (showLabelsInput ? levelSettings.levelName + " " : "") + (showPricesInput ? "(" + str.tostring(coord, format.mintick) + ")" : ""),
+                                   style = positionLabelsInput == "Left" ? label.style_label_right : label.style_label_left,
+                                   textcolor = levelSettings.levelColor,
+                                   color = #00000000,
+                                   xloc=xloc.bar_time)
+                
+                newGraphics.push(pivotGraphic.new(pivotLine, pivotLabel))
+    
+    drawnGraphics.add_row(array_id = newGraphics)
+
+    if drawnGraphics.rows() > maxHistoricalPivotsInput
+        oldGraphics = drawnGraphics.remove_row(0)
+        
+        for graphic in oldGraphics
+            graphic.delete()
+
+
+localPivotDrawConditionStatic = not isDailyBasedInput and localPivotTimeframeChange
+securityPivotDrawConditionStatic = isDailyBasedInput and securityPivotCounter != securityPivotCounter[1]
+
+// Track pivot point values for signal detection
+if not na(pivotPointsArray) and array.size(pivotPointsArray) > 0
+    newPP = array.get(pivotPointsArray, 0)[1]  // Get PP value (index 0, coordinate)
+    if not na(newPP)
+        // For daily pivots on intraday timeframes, use daily timeframe change
+        dailyChange = timeframe.change("1D")
+        
+        // Always update currentPP to reflect the most recent pivot point
+        if na(currentPP) or newPP != currentPP
+            // Update previousPP when we get a new daily period or new PP value
+            if dailyChange or (not na(currentPP) and newPP != currentPP)
+                previousPP := currentPP
+                pivotPeriodCounter := pivotPeriodCounter + 1
+            currentPP := newPP
+            
+        // Calculate bias on every bar once we have both current and previous PP
+        if not na(previousPP) and not na(currentPP)
+            isBullishBias := currentPP > previousPP
+
+// Removed multi-yearly logic since we're only using daily timeframe
+localPivotDrawConditionDeveloping = not isDailyBasedInput and time_close == time_close(pivotTimeframe)
+securityPivotDrawConditionDeveloping = false
+
+if (securityPivotDrawConditionStatic or localPivotDrawConditionStatic)
+    affixOldPivots(time)
+    drawNewPivots(time)
+
+// Debug: Plot current PP value to verify it's being calculated correctly (optional)
+plot(showDebugInput ? currentPP : na, title="Current PP", color=color.new(color.yellow, 50), linewidth=1)
+
+// Signal detection: Check if price closes above/below the current pivot point
+// Calculate close position relative to PP on each bar for consistency
+closedAbovePP = not na(currentPP) and close > currentPP
+closedBelowPP = not na(currentPP) and close < currentPP
+prevClosedAbovePP = not na(currentPP) and close[1] > currentPP
+prevClosedBelowPP = not na(currentPP) and close[1] < currentPP
+
+// Detect when candle closes above PP after previously being below (or vice versa)
+crossedAbove = closedAbovePP and prevClosedBelowPP
+crossedBelow = closedBelowPP and prevClosedAbovePP
+
+// Debug plots (optional) - shows small indicators for troubleshooting
+plotchar(showDebugInput and crossedAbove, "CrossedAbove", "▲", location.belowbar, color.green, size=size.tiny)
+plotchar(showDebugInput and crossedBelow, "CrossedBelow", "▼", location.abovebar, color.red, size=size.tiny)
+plotchar(showDebugInput and isBullishBias, "BullishBias", "B", location.top, color.blue, size=size.tiny)
+plotchar(showDebugInput and not na(previousPP), "HasPrevPP", "P", location.bottom, color.orange, size=size.tiny)
+
+// Debug values in data window (optional)
+plot(showDebugInput ? previousPP : na, title="Previous PP", color=color.new(color.orange, 80), linewidth=1, display=display.data_window)
+plot(showDebugInput ? (isBullishBias ? 1 : 0) : na, title="Bias (1=Bull, 0=Bear)", color=color.new(color.purple, 50), display=display.data_window)
+
+// Signal logic with bias filtering - now that bias detection is working
+if showSignalsInput and not na(currentPP) and not na(previousPP)
+    if crossedAbove and isBullishBias
+        // Bullish bias + crossing above PP = bullish signal
+        label.new(bar_index, low - (high - low) * 0.1, "▲", 
+                 color=color.new(color.green, 0), 
+                 textcolor=color.green, 
+                 style=label.style_none, 
+                 size=signalSize,
+                 tooltip="Bullish PP Cross")
+    else if crossedBelow and not isBullishBias
+        // Bearish bias + crossing below PP = bearish signal
+        label.new(bar_index, high + (high - low) * 0.1, "▼", 
+                 color=color.new(color.red, 0), 
+                 textcolor=color.red, 
+                 style=label.style_none, 
+                 size=signalSize,
+                 tooltip="Bearish PP Cross")
+
+// If possible, draw pivots from the beginning of the chart if none were found
+var FIRST_BAR_TIME = time
+if (barstate.islastconfirmedhistory and drawnGraphics.columns() == 0)
+
+    if not na(securityPivots) and securityPivotCounter > 0
+        if isDailyBasedInput
+            drawNewPivots(FIRST_BAR_TIME)
+        else 
+            runtime.error("Not enough intraday data to calculate Pivot Points. Lower the Pivots Timeframe or turn on the 'Use Daily-based Values' option in the indicator settings.")
+    else
+        runtime.error("Not enough data to calculate Pivot Points. Lower the Pivots Timeframe in the indicator settings.")
